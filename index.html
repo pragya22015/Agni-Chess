@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#060913" />
+  <title>Pragya Chess - Premium Edition</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+  
+  <style>
+    :root {
+      --bg-dark: #060913;
+      --bg-card: rgba(30, 41, 59, 0.6);
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.2);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: var(--bg-dark);
+      background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, transparent 50%);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0 0 80px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* SPLASH SCREEN & LOGO */
+    #splash {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg-dark);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.8s ease, visibility 0.8s;
+    }
+    .splash-logo {
+      width: 100px; height: 100px;
+      animation: pulseGlow 2s infinite alternate;
+    }
+    .splash-text {
+      font-size: 28px; font-weight: 800; color: var(--text-main);
+      margin-top: 20px; letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #fff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    @keyframes pulseGlow {
+      0% { filter: drop-shadow(0 0 10px var(--cyan)); transform: scale(0.95); }
+      100% { filter: drop-shadow(0 0 30px var(--cyan)); transform: scale(1.05); }
+    }
+
+    /* TOP BAR (Profile shifted here) */
+    .top-bar {
+      width: 100%; max-width: 600px;
+      padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(6, 9, 19, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .brand { font-size: 18px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .brand svg { width: 24px; height: 24px; filter: drop-shadow(0 0 5px var(--cyan)); }
+    .profile-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--cyan-dim); border: 1px solid var(--cyan);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .profile-btn:hover { background: var(--cyan); color: #000; }
+
+    /* LAYOUT & CARDS */
+    .app-container { width: 100%; max-width: 600px; padding: 16px; }
+    .view-section { display: none; animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .view-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 16px; padding: 20px; margin-bottom: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    
+    /* MOBILE TAP-TO-MOVE HIGHLIGHTS */
+    .square-55d63 { position: relative; }
+    .highlight-active { background: rgba(0, 229, 255, 0.4) !important; }
+    .highlight-dot::after {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      width: 28%; height: 28%; background: var(--cyan);
+      border-radius: 50%; transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px var(--cyan); pointer-events: none; z-index: 2;
+    }
+    .highlight-capture::after {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%; box-sizing: border-box;
+      border: 4px solid var(--cyan); border-radius: 50%;
+      background: transparent; pointer-events: none; z-index: 2;
+    }
+
+    /* BOTTOM NAV */
+    .bottom-nav {
+      position: fixed; bottom: 0; width: 100%; max-width: 600px;
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex; justify-content: space-around; padding: 12px 0 20px 0;
+      z-index: 1000; border-radius: 20px 20px 0 0;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      color: var(--text-muted); font-size: 11px; font-weight: 600;
+      cursor: pointer; width: 20%; transition: all 0.3s ease;
+    }
+    .nav-item.active { color: var(--cyan); transform: translateY(-3px); }
+    .nav-item.active .nav-icon {
+      background: var(--cyan-dim); border-radius: 12px; padding: 6px 12px;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+    }
+    .nav-icon { font-size: 20px; transition: all 0.3s ease; padding: 6px; }
+
+    /* COMPONENTS */
+    h2 { margin: 0 0 12px 0; font-size: 18px; }
+    p { margin: 0 0 12px 0; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+    .btn {
+      width: 100%; padding: 14px; border-radius: 12px; border: none;
+      font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: linear-gradient(135deg, #00e5ff, #0088ff); color: #000; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text-main); }
+    .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+    select, input {
+      width: 100%; padding: 14px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3);
+      color: var(--text-main); margin-bottom: 12px; outline: none;
+    }
+    select:focus, input:focus { border-color: var(--cyan); }
+    
+    .ai-thinking {
+      display: none; color: var(--cyan); font-size: 12px; font-weight: bold;
+      text-align: center; margin-top: 8px; animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <!-- SPLASH SCREEN -->
+  <div id="splash">
+    <!-- Premium Vector Logo embedded -->
+    <svg class="splash-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 10 L80 30 V70 L50 90 L20 70 V30 Z" stroke="#00e5ff" stroke-width="4"/>
+      <path d="M50 25 C65 25 70 40 70 55 H30 C30 40 35 25 50 25 Z" fill="#00e5ff"/>
+      <rect x="35" y="60" width="30" height="10" fill="#00e5ff"/>
+    </svg>
+    <div class="splash-text">Pragya Chess</div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 10 L80 30 V70 L50 90 L20 70 V30 Z" stroke="#00e5ff" stroke-width="8"/>
+        <path d="M50 30 C60 30 65 40 65 50 H35 C35 40 40 30 50 30 Z" fill="#00e5ff"/>
+      </svg>
+      Pragya
+    </div>
+    <!-- Profile moved to top right -->
+    <div class="profile-btn" onclick="navTo('profile')">👤</div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- 1. HOME -->
+    <div id="view-home" class="view-section active">
+      <div class="card" style="background: linear-gradient(145deg, rgba(30,41,59,0.8), rgba(0,0,0,0.5)); border-color: var(--cyan);">
+        <h3 style="color:var(--cyan); margin:0 0 4px 0;">Resume Journey</h3>
+        <h2 style="font-size:24px;">The Sicilian Defense</h2>
+        <p>Mastering the Najdorf Variation</p>
+        <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">
+          <div style="width:65%; height:100%; background:var(--cyan);"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="navTo('learn')">▶ Continue</button>
+      </div>
+      <div class="card">
+        <h2>Your Stats</h2>
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px;"><span>Elo Rating</span><span style="color:var(--cyan); font-weight:bold;">1240</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Puzzles Solved</span><span style="color:var(--cyan); font-weight:bold;">152</span></div>
+      </div>
+    </div>
+
+    <!-- 2. LEARN (Extensive Openings) -->
+    <div id="view-learn" class="view-section">
+      <div class="card">
+        <h2>Opening Explorer</h2>
+        <p>Learn from thousands of theoretical lines.</p>
+        <select id="lessonSelect" onchange="loadOpening()">
+          <optgroup label="White - 1. e4 Openings">
+            <option value="italian">Italian Game (Giuoco Piano)</option>
+            <option value="ruy">Ruy Lopez (Spanish)</option>
+            <option value="kingsgambit">King's Gambit</option>
+            <option value="scotch">Scotch Game</option>
+          </optgroup>
+          <optgroup label="White - 1. d4 Openings">
+            <option value="queensgambit">Queen's Gambit</option>
+            <option value="london">London System</option>
+          </optgroup>
+          <optgroup label="Black - Responses to e4">
+            <option value="sicilian">Sicilian Defense (Najdorf)</option>
+            <option value="french">French Defense</option>
+            <option value="carokann">Caro-Kann Defense</option>
+          </optgroup>
+        </select>
+        
+        <div id="boardLearn" style="width:100%; max-width:400px; margin:0 auto;"></div>
+        
+        <div style="background:rgba(0,229,255,0.1); padding:16px; border-radius:12px; border-left:4px solid var(--cyan); margin-top:16px;">
+          <h3 id="lessonTitle" style="color:var(--cyan); margin:0 0 8px 0;">Italian Game</h3>
+          <p id="lessonText" style="margin:0;">Tap your pieces to move. Play 1. e4 to begin.</p>
+        </div>
+        <button class="btn btn-secondary" style="margin-top:12px;" onclick="loadOpening()">🔄 Restart Variation</button>
+      </div>
+    </div>
+
+    <!-- 3. PLAY (Mobile Tap UI + AI) -->
+    <div id="view-play" class="view-section">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="background:var(--cyan); padding:8px; border-radius:8px;">🤖</div>
+            <strong>Pragya AI</strong>
+          </div>
+        </div>
+        
+        <div id="boardPlay" style="width:100%; max-width:400px; margin:0 auto;"></div>
+        <div id="aiThinking" class="ai-thinking">Pragya is thinking...</div>
+
+        <select id="aiPersona" style="margin-top:16px;">
+          <option value="5">Beginner (Fast)</option>
+          <option value="10" selected>Club Player (Balanced)</option>
+          <option value="15">Master (Deep Thinking)</option>
+        </select>
+        
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="boardPlayObj.flip()">🔃 Flip</button>
+          <button class="btn btn-secondary" onclick="undoPlayMove()">⏪ Undo</button>
+          <button class="btn btn-primary" onclick="resetPlayBoard()">🔄 New Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. PUZZLES (New feature) -->
+    <div id="view-puzzles" class="view-section">
+      <div class="card">
+        <h2>Tactics Trainer</h2>
+        <p>Find the best move for <b id="puzzleTurn" style="color:var(--cyan);">White</b>.</p>
+        <div id="boardPuzzle" style="width:100%; max-width:400px; margin:0 auto;"></div>
+        <div id="puzzleMsg" style="margin-top:16px; font-weight:bold; text-align:center;">Can you find the forced mate?</div>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="nextPuzzle()">Skip / Next Puzzle</button>
+      </div>
+    </div>
+
+    <!-- 5. ANALYZE -->
+    <div id="view-analyze" class="view-section">
+      <div class="card">
+        <h2>Game Analysis</h2>
+        <div style="display:flex; gap:10px; margin-bottom:16px;">
+          <input type="text" id="lichessId" placeholder="Lichess Username..." style="margin:0;" />
+          <button class="btn btn-primary" style="width:100px;" onclick="fetchLichess()">Fetch</button>
+        </div>
+        <div id="boardAnalyze" style="width:100%; max-width:400px; margin:0 auto;"></div>
+        <div style="background:rgba(0,0,0,0.3); padding:16px; border-radius:12px; margin-top:16px; text-align:center;" id="analyzeMsg">
+          Load a game to start engine evaluation.
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="prevAnalyzeMove()">◀ Prev</button>
+          <button class="btn btn-primary" onclick="nextAnalyzeMove()">Next ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. PROFILE -->
+    <div id="view-profile" class="view-section">
+      <div class="card" style="text-align:center;">
+        <div style="width:80px; height:80px; border-radius:50%; background:linear-gradient(135deg, var(--cyan), #0088ff); margin:0 auto 12px; display:flex; align-items:center; justify-content:center; font-size:32px;">👤</div>
+        <h2>Your Profile</h2>
+        <p>Manage your account and engine preferences.</p>
+      </div>
+      <div class="card">
+        <h3>⚙️ Engine Processing</h3>
+        <select id="engineToggle">
+          <option value="cloud">☁️ Cloud Engine (Stable, Battery Saver)</option>
+          <option value="local">💻 Local Engine (Fast, Uses CPU)</option>
+        </select>
+        <p style="font-size:12px;">Cloud processing is recommended for mobile devices to prevent battery drain.</p>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="navTo('home')" id="nav-home"><div class="nav-icon">🏠</div>Home</div>
+    <div class="nav-item" onclick="navTo('learn')" id="nav-learn"><div class="nav-icon">📖</div>Learn</div>
+    <div class="nav-item" onclick="navTo('play')" id="nav-play"><div class="nav-icon">⚔️</div>Play</div>
+    <div class="nav-item" onclick="navTo('puzzles')" id="nav-puzzles"><div class="nav-icon">🧩</div>Puzzles</div>
+    <div class="nav-item" onclick="navTo('analyze')" id="nav-analyze"><div class="nav-icon">🔍</div>Analyze</div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
+  <script>
+    // --- Splash Screen Logic ---
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splash');
+        splash.style.opacity = '0';
+        setTimeout(() => splash.style.display = 'none', 800);
+      }, 2000);
+    });
+
+    // --- Navigation Logic ---
+    function navTo(viewId) {
+      $('.view-section').removeClass('active');
+      $('.nav-item').removeClass('active');
+      
+      $('#view-' + viewId).addClass('active');
+      if(viewId !== 'profile') $('#nav-' + viewId).addClass('active');
+      
+      // Resize boards to prevent glitching
+      setTimeout(() => {
+        if(boardPlayObj) boardPlayObj.resize();
+        if(boardLearnObj) boardLearnObj.resize();
+        if(boardPuzzleObj) boardPuzzleObj.resize();
+        if(boardAnalyzeObj) boardAnalyzeObj.resize();
+      }, 50);
+    }
+
+    // --- Modern Tap-to-Move Logic (Dots & Highlights) ---
+    // We wrap chessboardjs to allow tap selection instead of just drag/drop
+    function enableMobileTap(boardId, gameInstance, boardInstance, onMoveCallback) {
+      let selectedSquare = null;
+      
+      $('#' + boardId).on('click', '.square-55d63', function() {
+        const sq = $(this).attr('data-square');
+        const piece = gameInstance.get(sq);
+        
+        // Clear previous highlights
+        $('#' + boardId + ' .square-55d63').removeClass('highlight-active highlight-dot highlight-capture');
+
+        // If clicking a valid destination to move
+        if (selectedSquare) {
+          const moves = gameInstance.moves({ square: selectedSquare, verbose: true });
+          const move = moves.find(m => m.to === sq);
+          
+          if (move) {
+            gameInstance.move({ from: selectedSquare, to: sq, promotion: 'q' });
+            boardInstance.position(gameInstance.fen(), true);
+            selectedSquare = null;
+            if(onMoveCallback) onMoveCallback();
+            return;
+          }
+        }
+
+        // Select new piece
+        if (piece && piece.color === gameInstance.turn()) {
+          selectedSquare = sq;
+          $(this).addClass('highlight-active');
+          
+          // Draw dots on valid moves
+          const moves = gameInstance.moves({ square: sq, verbose: true });
+          moves.forEach(m => {
+            const targetSq = $('.square-' + m.to);
+            if (gameInstance.get(m.to)) {
+              targetSq.addClass('highlight-capture');
+            } else {
+              targetSq.addClass('highlight-dot');
+            }
+          });
+        } else {
+          selectedSquare = null;
+        }
+      });
+    }
+
+    const boardConfig = { pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png', moveSpeed: 'fast' };
+
+    // ==========================================
+    // 1. PLAY vs AI
+    // ==========================================
+    const gamePlay = new Chess();
+    let boardPlayObj = Chessboard('boardPlay', { ...boardConfig, position: 'start' });
+    
+    enableMobileTap('boardPlay', gamePlay, boardPlayObj, async () => {
+      if (gamePlay.game_over()) return;
+      $('#aiThinking').show();
+      
+      const depth = $('#aiPersona').val();
+      try {
+        const res = await fetch('https://chess-api.com/v1', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fen: gamePlay.fen(), depth: parseInt(depth) })
+        });
+        const data = await res.json();
+        if(data.san) {
+          setTimeout(() => {
+            gamePlay.move(data.san);
+            boardPlayObj.position(gamePlay.fen(), true);
+            $('#aiThinking').hide();
+          }, 300);
+        }
+      } catch(e) { $('#aiThinking').text("AI offline. Check internet."); }
+    });
+
+    function undoPlayMove() { gamePlay.undo(); gamePlay.undo(); boardPlayObj.position(gamePlay.fen()); }
+    function resetPlayBoard() { gamePlay.reset(); boardPlayObj.start(); $('#aiThinking').hide(); }
+
+    // ==========================================
+    // 2. OPENINGS (LEARN)
+    // ==========================================
+    const gameLearn = new Chess();
+    let boardLearnObj = Chessboard('boardLearn', { ...boardConfig, position: 'start' });
+    
+    const openingData = {
+      italian: { moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4'], desc: "The Italian Game focuses on fast development and eyeing the weak f7 square." },
+      ruy: { moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'], desc: "The Ruy Lopez puts immediate pressure on the defender of the e5 pawn." },
+      sicilian: { moves: ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4', 'Nxd4', 'Nf6', 'Nc3', 'a6'], desc: "The Najdorf Sicilian. Sharp, aggressive, and highly theoretical." },
+      queensgambit: { moves: ['d4', 'd5', 'c4'], desc: "The Queen's Gambit offers a wing pawn to control the center." }
+    };
+    
+    let currentOpeningMoves = [];
+    let openingStep = 0;
+
+    function loadOpening() {
+      const id = $('#lessonSelect').val();
+      const op = openingData[id] || openingData.italian;
+      gameLearn.reset(); boardLearnObj.start();
+      currentOpeningMoves = op.moves;
+      openingStep = 0;
+      $('#lessonTitle').text($('#lessonSelect option:selected').text());
+      $('#lessonText').text(`Play 1. ${currentOpeningMoves[0]}`);
+    }
+
+    enableMobileTap('boardLearn', gameLearn, boardLearnObj, () => {
+      const history = gameLearn.history();
+      const lastMove = history[history.length - 1];
+      
+      if (lastMove !== currentOpeningMoves[openingStep]) {
+        gameLearn.undo(); boardLearnObj.position(gameLearn.fen());
+        alert("Incorrect move! Try playing " + currentOpeningMoves[openingStep]);
+        return;
+      }
+      
+      openingStep++;
+      if (openingStep < currentOpeningMoves.length) {
+        const aiMove = currentOpeningMoves[openingStep];
+        setTimeout(() => {
+          gameLearn.move(aiMove); boardLearnObj.position(gameLearn.fen(), true);
+          openingStep++;
+          if (openingStep < currentOpeningMoves.length) {
+            $('#lessonText').text(`They played ${aiMove}. Now play ${currentOpeningMoves[openingStep]}`);
+          } else {
+            $('#lessonText').text("Variation Complete! " + (openingData[$('#lessonSelect').val()]?.desc || ""));
+          }
+        }, 500);
+      } else {
+        $('#lessonText').text("Variation Complete! " + (openingData[$('#lessonSelect').val()]?.desc || ""));
+      }
+    });
+
+    // ==========================================
+    // 3. PUZZLES
+    // ==========================================
+    const gamePuzzle = new Chess();
+    const puzzles = [
+      { fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', move: 'Ng5', desc: "Find the Fried Liver attack initiator!" },
+      { fen: 'rnbqkbnr/ppppp2p/8/5pp1/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2', move: 'Qh5', desc: "Mate in 1 (Fool's Mate pattern)" }
+    ];
+    let currentPuzzleIndex = 0;
+    let boardPuzzleObj = Chessboard('boardPuzzle', { ...boardConfig, position: 'start' });
+
+    function loadPuzzle() {
+      const pz = puzzles[currentPuzzleIndex];
+      gamePuzzle.load(pz.fen);
+      boardPuzzleObj.position(pz.fen);
+      const turnText = gamePuzzle.turn() === 'w' ? 'White' : 'Black';
+      $('#puzzleTurn').text(turnText);
+      $('#puzzleMsg').text(pz.desc);
+    }
+    function nextPuzzle() {
+      currentPuzzleIndex = (currentPuzzleIndex + 1) % puzzles.length;
+      loadPuzzle();
+    }
+
+    enableMobileTap('boardPuzzle', gamePuzzle, boardPuzzleObj, () => {
+      const history = gamePuzzle.history();
+      const lastMove = history[history.length - 1];
+      if (lastMove === puzzles[currentPuzzleIndex].move || lastMove.includes('#')) {
+        $('#puzzleMsg').html("<span style='color:var(--cyan)'>Correct! Excellent vision.</span>");
+        setTimeout(nextPuzzle, 2000);
+      } else {
+        gamePuzzle.undo(); boardPuzzleObj.position(gamePuzzle.fen());
+        $('#puzzleMsg').html("<span style='color:red'>Incorrect. Try again!</span>");
+      }
+    });
+
+    // ==========================================
+    // 4. ANALYZE (Lichess Fetcher)
+    // ==========================================
+    const gameAnalyze = new Chess();
+    let analyzeHistory = []; let analyzeIndex = 0;
+    let boardAnalyzeObj = Chessboard('boardAnalyze', { ...boardConfig });
+
+    async function fetchLichess() {
+      const user = $('#lichessId').val().trim();
+      if(!user) return;
+      $('#analyzeMsg').text("Fetching...");
+      try {
+        const res = await fetch(`https://lichess.org/api/games/user/${user}?max=1&pgnInJson=false`);
+        if(gameAnalyze.load_pgn(await res.text())) {
+          analyzeHistory = gameAnalyze.history();
+          gameAnalyze.reset(); analyzeIndex = 0; boardAnalyzeObj.position('start');
+          $('#analyzeMsg').text(`Loaded ${analyzeHistory.length} moves. Use buttons to step.`);
+        }
+      } catch(e) { $('#analyzeMsg').text("Error fetching."); }
+    }
+    function nextAnalyzeMove() {
+      if(analyzeIndex >= analyzeHistory.length) return;
+      gameAnalyze.move(analyzeHistory[analyzeIndex++]);
+      boardAnalyzeObj.position(gameAnalyze.fen());
+    }
+    function prevAnalyzeMove() {
+      if(analyzeIndex <= 0) return;
+      gameAnalyze.undo(); analyzeIndex--;
+      boardAnalyzeObj.position(gameAnalyze.fen());
+    }
+
+    // Init
+    loadOpening();
+    loadPuzzle();
+  </script>
+</body>
+</html>
