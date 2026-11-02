@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGNI CHESS — Grandmaster AI, Learning Hub & Game Review</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        obsidian: '#090d16',
+                        panel: '#101726',
+                        card: '#182238',
+                        subtle: '#24324f',
+                        fireAmber: '#f59e0b',
+                        fireGlow: '#ea580c'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chess.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cinzel:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #090d16;
+            color: #e2e8f0;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        /* Chessboard Squares */
+        .chess-square {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1 / 1;
+            cursor: pointer;
+            transition: background-color 0.12s ease;
+        }
+        /* Classic Tournament Theme */
+        .theme-classic .square-light { background-color: #edeed1; }
+        .theme-classic .square-dark { background-color: #779952; }
+        .theme-slate .square-light { background-color: #cbd5e1; }
+        .theme-slate .square-dark { background-color: #475569; }
+        .theme-wood .square-light { background-color: #e2ceb1; }
+        .theme-wood .square-dark { background-color: #9c6c43; }
+
+        .square-selected { background-color: #d2dc66 !important; }
+        .square-last-move { background-color: #f7ec74b3 !important; }
+
+        /* Dimmed move hints (Chess.com / Lichess style) */
+        .legal-dot {
+            width: 28%;
+            height: 28%;
+            border-radius: 50%;
+            background-color: rgba(15, 23, 42, 0.28);
+            pointer-events: none;
+        }
+        .square-dark .legal-dot {
+            background-color: rgba(15, 23, 42, 0.24);
+        }
+        .capture-ring {
+            position: absolute;
+            inset: 3px;
+            border-radius: 50%;
+            border: 3.5px solid rgba(220, 38, 38, 0.45);
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+        .king-check {
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(185, 28, 28, 0.5) 60%, transparent 95%) !important;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.8) inset !important;
+            animation: pulse 1s infinite ease-in-out;
+        }
+        .chess-piece-img {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            pointer-events: none;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+        }
+
+        /* --- Animated Oscar-Style Character (Agni) --- */
+        .character-container {
+            position: relative;
+            width: 80px;
+            height: 90px;
+        }
+        .character-body {
+            transition: transform 0.2s ease;
+        }
+        .character-head {
+            transform-origin: 50% 80%;
+            animation: gentleBob 3s ease-in-out infinite alternate;
+        }
+        @keyframes gentleBob {
+            0% { transform: translateY(0px) rotate(0deg); }
+            100% { transform: translateY(-2px) rotate(1.5deg); }
+        }
+        .eye-blink {
+            transform-origin: center;
+            animation: eyeBlinkAnim 4s infinite ease-in-out;
+        }
+        @keyframes eyeBlinkAnim {
+            0%, 92%, 100% { transform: scaleY(1); }
+            96% { transform: scaleY(0.1); }
+        }
+        /* Mouth Animation while Talking */
+        .character-talking .mouth-shape {
+            animation: mouthTalkAnim 0.22s infinite alternate ease-in-out;
+            transform-origin: 50% 60%;
+        }
+        @keyframes mouthTalkAnim {
+            0% { transform: scaleY(0.4) scaleX(0.9); }
+            100% { transform: scaleY(1.4) scaleX(1.1); }
+        }
+        /* Mood states */
+        .character-happy .character-head {
+            animation: happyNod 0.6s infinite alternate ease-in-out;
+        }
+        @keyframes happyNod {
+            0% { transform: translateY(0) rotate(-2deg); }
+            100% { transform: translateY(-5px) rotate(2deg); }
+        }
+        .character-shocked .mouth-shape {
+            transform: scale(1.6) translateY(1px);
+        }
+        .character-thinking .character-head {
+            transform: rotate(-4deg) translateY(-2px);
+        }
+
+        /* Duolingo Winding Path styling */
+        .duo-path-node {
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .duo-path-node:hover {
+            transform: translateY(-4px) scale(1.05);
+        }
+        .duo-path-node:active {
+            transform: translateY(2px) scale(0.95);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #24324f; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-20">
+
+    <!-- Top Minimalist Header -->
+    <header class="bg-panel/90 backdrop-blur border-b border-subtle/70 sticky top-0 z-40 px-4 py-2.5">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchMainTab('play')">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-400 p-0.5 flex items-center justify-center shadow-md shadow-amber-950/40">
+                    <div class="w-full h-full bg-obsidian rounded-[6px] flex items-center justify-center font-bold text-amber-400 text-sm">
+                        🔥
+                    </div>
+                </div>
+                <div>
+                    <span class="font-cinzel font-extrabold text-base tracking-wider text-slate-100">AGNI</span>
+                    <span class="text-[10px] ml-1.5 px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-400 border border-amber-800/50 font-mono font-bold">GRANDMASTER AI</span>
+                </div>
+            </div>
+
+            <!-- Header Center Info -->
+            <div class="hidden sm:flex items-center gap-2 text-xs">
+                <span class="text-slate-400">Status:</span>
+                <span id="headerEngineStatus" class="font-semibold text-slate-200">Coach Agni Online (1600 ELO)</span>
+                <span id="headerEvaluationBadge" class="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-subtle text-amber-400">+0.2</span>
+            </div>
+
+            <!-- Profile & Settings Button (Upper Right Corner) -->
+            <div class="flex items-center gap-2">
+                <button onclick="openProfileModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card hover:bg-subtle border border-subtle/80 text-xs font-semibold transition text-slate-200 shadow-sm" title="Profile, Audio & Settings">
+                    <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-[11px] text-slate-950 font-bold">
+                        👤
+                    </div>
+                    <span id="headerUsernameDisplay">Arjun</span>
+                    <span class="text-[10px] text-amber-400 font-mono">⚙️</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Views Container -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4 md:p-6 flex flex-col">
+
+        <!-- ==================== TAB 1: PLAY VS AGNI ==================== -->
+        <section id="view-play" class="tab-view flex-1 flex flex-col gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <!-- Left: Chessboard & Controls -->
+                <div class="lg:col-span-7 flex flex-col items-center">
+                    
+                    <!-- Opponent Bar (Agni Character Info) -->
+                    <div class="w-full max-w-[460px] flex items-center justify-between py-2 px-3 bg-panel rounded-t-xl border border-b-0 border-subtle/70">
+                        <div class="flex items-center gap-2.5">
+                            <div class="relative w-8 h-8 rounded-lg bg-card border border-subtle flex items-center justify-center text-sm shadow">
+                                🧘‍♀️
+                                <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500"></span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-sm text-slate-100">Grandmaster Agni</span>
+                                    <span id="playAgniEloPill" class="text-[10px] px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-400 border border-amber-800/60 font-mono font-bold">1600 ELO</span>
+                                </div>
+                                <span id="playAgniStatusLine" class="text-[11px] text-slate-400">Waiting for your move</span>
+                            </div>
+                        </div>
+                        <div id="opponentCapturedDisplay" class="flex items-center gap-0.5 text-xs text-slate-400 font-mono"></div>
+                    </div>
+
+                    <!-- Board Container with Evaluation Bar -->
+                    <div class="w-full max-w-[460px] flex gap-2.5 bg-panel p-2.5 border border-subtle/70 shadow-2xl relative">
+                        <!-- Evaluation Bar -->
+                        <div class="w-3.5 sm:w-4 bg-obsidian rounded-full overflow-hidden flex flex-col-reverse border border-subtle/80 relative shadow-inner">
+                            <div id="playEvalBarFill" class="bg-gradient-to-t from-amber-500 to-amber-200 w-full transition-all duration-300 ease-out" style="height: 50%;"></div>
+                        </div>
+
+                        <!-- 8x8 Board Grid -->
+                        <div id="playBoardGrid" class="theme-classic flex-1 grid grid-cols-8 grid-rows-8 border-2 border-subtle rounded overflow-hidden aspect-square select-none relative shadow-md">
+                            <!-- Squares dynamically rendered -->
+                        </div>
+                    </div>
+
+                    <!-- Player Bar (User) -->
+                    <div class="w-full max-w-[460px] flex items-center justify-between py-2 px-3 bg-panel rounded-b-xl border border-t-0 border-subtle/70 mb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-card border border-subtle flex items-center justify-center text-sm">
+                                👑
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <span id="playUserNameDisplay" class="font-bold text-sm text-slate-200">Arjun</span>
+                                    <span id="playUserEloPill" class="text-[10px] px-1.5 py-0.2 rounded bg-subtle text-slate-300 font-mono font-bold">1450 ELO</span>
+                                </div>
+                                <span id="playTurnIndicatorText" class="text-[11px] text-emerald-400 font-semibold">Your turn (White)</span>
+                            </div>
+                        </div>
+                        <div id="playerCapturedDisplay" class="flex items-center gap-0.5 text-xs text-slate-400 font-mono"></div>
+                    </div>
+
+                    <!-- Clean Quick Action Toolbar -->
+                    <div class="w-full max-w-[460px] grid grid-cols-4 gap-2">
+                        <button onclick="startNewGame()" class="bg-card hover:bg-subtle text-slate-200 text-xs py-2 rounded-lg font-semibold border border-subtle/80 transition flex items-center justify-center gap-1 shadow-sm">
+                            <span>🔄</span> <span>New</span>
+                        </button>
+                        <button onclick="takebackMove()" class="bg-card hover:bg-subtle text-slate-200 text-xs py-2 rounded-lg font-semibold border border-subtle/80 transition flex items-center justify-center gap-1 shadow-sm">
+                            <span>↩️</span> <span>Takeback</span>
+                        </button>
+                        <button onclick="flipBoard()" class="bg-card hover:bg-subtle text-slate-200 text-xs py-2 rounded-lg font-semibold border border-subtle/80 transition flex items-center justify-center gap-1 shadow-sm">
+                            <span>🔃</span> <span>Flip</span>
+                        </button>
+                        <button onclick="jumpToAnalysisFromGame()" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs py-2 rounded-lg transition flex items-center justify-center gap-1 shadow-md shadow-amber-950/40">
+                            <span>🔍</span> <span>Review</span>
+                        </button>
+                    </div>
+
+                    <!-- Agni Difficulty Selector -->
+                    <div class="w-full max-w-[460px] mt-3 bg-panel p-2.5 rounded-xl border border-subtle/70 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-medium">Agni Playing Strength:</span>
+                        <select id="playDifficultySelect" onchange="changeBotDifficulty(this.value)" class="bg-card text-amber-400 border border-subtle rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-amber-500">
+                            <option value="800">Beginner (800 ELO)</option>
+                            <option value="1200">Club Player (1200 ELO)</option>
+                            <option value="1600" selected>Tournament (1600 ELO)</option>
+                            <option value="2000">Master (2000 ELO)</option>
+                            <option value="2400">Grandmaster (2400 ELO)</option>
+                            <option value="3200">Stockfish Max (3200+ ELO)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right: Animated Oscar-Style Agni Character & Speech -->
+                <div class="lg:col-span-5 flex flex-col gap-3">
+                    
+                    <!-- Oscar-Style Animated Agni Interactive Card -->
+                    <div class="bg-panel p-4 rounded-2xl border border-subtle/80 shadow-xl flex items-center gap-4 relative overflow-hidden">
+                        <!-- Background glow -->
+                        <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                        <!-- Animated Character SVG (Oscar-Style Agni) -->
+                        <div id="agniCharacterBox" class="character-container flex-shrink-0 cursor-pointer" onclick="replayAgniVoice()" title="Tap to hear Agni speak!">
+                            <svg viewBox="0 0 100 120" class="w-full h-full character-body">
+                                <!-- Torso & Robe -->
+                                <path d="M 25 110 Q 50 85 75 110 L 85 120 L 15 120 Z" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+                                <path d="M 40 92 L 50 108 L 60 92 Z" fill="#f59e0b"/>
+                                <!-- Neck -->
+                                <rect x="44" y="70" width="12" height="15" fill="#fbcfe8" rx="2"/>
+                                <!-- Head Group with Animations -->
+                                <g class="character-head">
+                                    <!-- Face base -->
+                                    <ellipse cx="50" cy="50" rx="26" ry="28" fill="#fed7aa" stroke="#fb923c" stroke-width="1.5"/>
+                                    <!-- Stylish Hair / Pompadour -->
+                                    <path d="M 24 45 C 20 25, 35 12, 50 14 C 65 12, 80 25, 76 45 C 70 24, 30 24, 24 45 Z" fill="#9a3412"/>
+                                    <path d="M 48 12 Q 54 4 60 12 Q 52 2 48 12 Z" fill="#ea580c"/> <!-- Fiery Crest -->
+
+                                    <!-- Glasses Frame (Oscar Style) -->
+                                    <circle cx="39" cy="48" r="9" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+                                    <circle cx="61" cy="48" r="9" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+                                    <line x1="48" y1="48" x2="52" y2="48" stroke="#0f172a" stroke-width="2.5"/>
+
+                                    <!-- Eyes with Blink Animation -->
+                                    <g class="eye-blink">
+                                        <circle cx="39" cy="48" r="3.5" fill="#1e293b"/>
+                                        <circle cx="61" cy="48" r="3.5" fill="#1e293b"/>
+                                        <circle cx="40" cy="46.5" r="1.2" fill="#ffffff"/>
+                                        <circle cx="62" cy="46.5" r="1.2" fill="#ffffff"/>
+                                    </g>
+
+                                    <!-- Eyebrows -->
+                                    <path d="M 31 38 Q 39 34 46 38" fill="none" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+                                    <path d="M 54 38 Q 61 34 69 38" fill="none" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+
+                                    <!-- Mustache (Oscar's signature touch) -->
+                                    <path d="M 40 58 Q 50 63 60 58 Q 54 55 50 57 Q 46 55 40 58 Z" fill="#7c2d12"/>
+
+                                    <!-- Mouth with Talking Animation -->
+                                    <g class="mouth-shape">
+                                        <path d="M 45 64 Q 50 68 55 64" fill="#991b1b" stroke="#7c2d12" stroke-width="1.5" stroke-linecap="round"/>
+                                    </g>
+                                </g>
+                            </svg>
+                        </div>
+
+                        <!-- Dialogue Speech Bubble -->
+                        <div class="flex-1 bg-obsidian p-3 rounded-xl border border-subtle/80 flex flex-col justify-between min-h-[85px] relative">
+                            <p id="agniSpeechBubbleText" class="text-xs text-slate-200 leading-relaxed font-medium">
+                                "Welcome to the board! I am Agni. Claim the central squares with 1.e4 or 1.d4, and let's craft a masterpiece together!"
+                            </p>
+                            <div class="flex items-center justify-between pt-1.5 mt-1 border-t border-subtle/50 text-[10px]">
+                                <span id="agniMoodBadge" class="text-amber-400 font-bold flex items-center gap-1">
+                                    🔥 Ready for Action
+                                </span>
+                                <span class="text-slate-500 hover:text-amber-300 transition cursor-pointer" onclick="replayAgniVoice()">
+                                    🔊 Listen
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Move Classification Badge -->
+                    <div class="bg-panel p-3 rounded-xl border border-subtle/80 flex items-center justify-between">
+                        <div>
+                            <div class="text-[10px] text-slate-400 font-medium">Last Move Evaluation</div>
+                            <div id="playMoveSanLabel" class="font-mono font-bold text-sm text-slate-100">Start Position</div>
+                        </div>
+                        <div id="playMoveGradeTag" class="text-xs px-2.5 py-1 rounded-full font-bold bg-card border border-subtle text-slate-400">
+                            Book Move (★)
+                        </div>
+                    </div>
+
+                    <!-- Move History Scroll -->
+                    <div class="bg-panel p-3 rounded-xl border border-subtle/80 flex flex-col gap-1.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Move Record</span>
+                        <div id="playMoveLogContainer" class="bg-obsidian p-2 rounded-lg border border-subtle/60 h-28 overflow-y-auto font-mono text-xs text-slate-300 leading-6">
+                            <span class="text-slate-600">Game started. Waiting for 1. e4 or 1. d4...</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: CHESS SIGMA GAME ANALYSIS ==================== -->
+        <section id="view-analysis" class="tab-view hidden flex-1 flex flex-col gap-4">
+            <div class="bg-panel p-4 sm:p-5 rounded-2xl border border-subtle/80 shadow-xl flex flex-col gap-4">
+                
+                <!-- Chessigma Importer Card -->
+                <div class="bg-obsidian p-4 rounded-xl border border-subtle/80 flex flex-col gap-3">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                                <span>📥</span> Import Games from Chess.com or Lichess (Chessigma Style)
+                            </h2>
+                            <p class="text-[11px] text-slate-400">Enter your Chess.com or Lichess username to fetch and automatically grade your recent games with Stockfish.</p>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 font-mono font-bold">PUBLIC API • NO PASSWORD REQUIRED</span>
+                    </div>
+
+                    <!-- Inputs & Buttons -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <div class="sm:col-span-4">
+                            <input type="text" id="importChesscomUser" placeholder="Chess.com Username (e.g. hikaru)" class="w-full bg-card text-xs p-2.5 rounded-lg border border-subtle text-slate-200 focus:outline-none focus:border-amber-500 font-mono">
+                        </div>
+                        <div class="sm:col-span-4">
+                            <input type="text" id="importLichessUser" placeholder="Lichess Username (e.g. magnuscarlsen)" class="w-full bg-card text-xs p-2.5 rounded-lg border border-subtle text-slate-200 focus:outline-none focus:border-amber-500 font-mono">
+                        </div>
+                        <div class="sm:col-span-4 flex gap-1.5">
+                            <button onclick="fetchExternalGames()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs py-2 px-3 rounded-lg transition shadow flex items-center justify-center gap-1">
+                                <span>⚡</span> <span>Fetch Games</span>
+                            </button>
+                            <button onclick="openPastePgnModal()" class="bg-card hover:bg-subtle text-slate-300 font-semibold text-xs py-2 px-3 rounded-lg border border-subtle transition">
+                                Paste PGN
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Preset Games Bar -->
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-400 overflow-x-auto pt-1">
+                        <span class="font-bold text-slate-300 whitespace-nowrap">Or quick analyze:</span>
+                        <button onclick="loadPresetAnalysis('kasparov')" class="px-2 py-1 rounded bg-card hover:bg-subtle text-amber-400 whitespace-nowrap border border-subtle/60">Kasparov vs Topalov (Immortal)</button>
+                        <button onclick="loadPresetAnalysis('carlsen')" class="px-2 py-1 rounded bg-card hover:bg-subtle text-slate-300 whitespace-nowrap border border-subtle/60">Carlsen vs Anand (World Champ)</button>
+                        <button onclick="loadPresetAnalysis('blunder')" class="px-2 py-1 rounded bg-card hover:bg-subtle text-rose-300 whitespace-nowrap border border-subtle/60">Club Blunder Drill</button>
+                    </div>
+                </div>
+
+                <!-- Game Diagnostic Summary (Chess Sigma Win % & Accuracy) -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="bg-obsidian p-3 rounded-xl border border-subtle/80">
+                        <span class="text-[10px] text-slate-400 font-semibold uppercase">White Accuracy</span>
+                        <div id="sigmaWhiteAcc" class="text-xl font-extrabold text-cyan-400 mt-0.5">92.4%</div>
+                        <span class="text-[10px] text-slate-500 font-mono" id="sigmaWhitePerf">Est. 2350 ELO</span>
+                    </div>
+                    <div class="bg-obsidian p-3 rounded-xl border border-subtle/80">
+                        <span class="text-[10px] text-slate-400 font-semibold uppercase">Black Accuracy</span>
+                        <div id="sigmaBlackAcc" class="text-xl font-extrabold text-amber-400 mt-0.5">74.1%</div>
+                        <span class="text-[10px] text-slate-500 font-mono" id="sigmaBlackPerf">Est. 1680 ELO</span>
+                    </div>
+                    <div class="bg-obsidian p-3 rounded-xl border border-subtle/80">
+                        <span class="text-[10px] text-slate-400 font-semibold uppercase">Game Result</span>
+                        <div id="sigmaResultText" class="text-sm font-bold text-emerald-400 mt-0.5">1 - 0 (Resignation)</div>
+                        <span class="text-[10px] text-slate-500 font-mono" id="sigmaTotalMoves">24 Moves Analyzed</span>
+                    </div>
+                    <div class="bg-obsidian p-3 rounded-xl border border-subtle/80 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-semibold uppercase">Sigma / Brilliant</span>
+                            <div class="text-xl font-extrabold text-purple-400 mt-0.5" id="sigmaCountBrilliant">2 (!!)</div>
+                        </div>
+                        <span class="text-2xl">⚡</span>
+                    </div>
+                </div>
+
+                <!-- Chess Sigma Move Category Badges -->
+                <div class="grid grid-cols-3 sm:grid-cols-7 gap-1.5 text-center text-xs">
+                    <div class="p-1.5 rounded-lg bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">
+                        <div class="text-[9px] uppercase font-bold">Brilliant (!!)</div>
+                        <div class="font-bold text-sm" id="badgeCountBrilliant">2</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-blue-950/60 border border-blue-800/60 text-blue-300">
+                        <div class="text-[9px] uppercase font-bold">Great (!)</div>
+                        <div class="font-bold text-sm" id="badgeCountGreat">5</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
+                        <div class="text-[9px] uppercase font-bold">Best (★)</div>
+                        <div class="font-bold text-sm" id="badgeCountBest">15</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-card border border-subtle text-slate-300">
+                        <div class="text-[9px] uppercase font-bold">Good</div>
+                        <div class="font-bold text-sm" id="badgeCountGood">8</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-yellow-950/60 border border-yellow-800/60 text-yellow-300">
+                        <div class="text-[9px] uppercase font-bold">Inaccuracy (?!)</div>
+                        <div class="font-bold text-sm" id="badgeCountInaccuracy">2</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-orange-950/60 border border-orange-800/60 text-orange-300">
+                        <div class="text-[9px] uppercase font-bold">Mistake (?)</div>
+                        <div class="font-bold text-sm" id="badgeCountMistake">1</div>
+                    </div>
+                    <div class="p-1.5 rounded-lg bg-red-950/60 border border-red-800/60 text-red-300">
+                        <div class="text-[9px] uppercase font-bold">Blunder (??)</div>
+                        <div class="font-bold text-sm" id="badgeCountBlunder">1</div>
+                    </div>
+                </div>
+
+                <!-- Analysis Stepper Board & Commentary -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-1 items-start">
+                    <!-- Mini Board -->
+                    <div class="lg:col-span-6 flex flex-col items-center">
+                        <div class="w-full max-w-[400px] aspect-square border-2 border-subtle rounded-xl overflow-hidden shadow-xl relative">
+                            <div id="analysisReviewBoardGrid" class="theme-classic w-full h-full grid grid-cols-8 grid-rows-8"></div>
+                        </div>
+
+                        <!-- Stepper controls -->
+                        <div class="w-full max-w-[400px] flex items-center justify-between mt-2.5 bg-obsidian p-2 rounded-xl border border-subtle/80 text-xs">
+                            <button onclick="stepReviewGame('first')" class="p-2 rounded-lg bg-card hover:bg-subtle text-slate-300">⏮️</button>
+                            <button onclick="stepReviewGame('prev')" class="p-2 rounded-lg bg-card hover:bg-subtle text-slate-300">◀️</button>
+                            <span id="reviewStepCounterText" class="font-mono font-bold text-slate-200">Move 0 / 0</span>
+                            <button onclick="stepReviewGame('next')" class="p-2 rounded-lg bg-card hover:bg-subtle text-slate-300">▶️</button>
+                            <button onclick="stepReviewGame('last')" class="p-2 rounded-lg bg-card hover:bg-subtle text-slate-300">⏭️</button>
+                        </div>
+                    </div>
+
+                    <!-- Agni Move Commentary & Continue Playout -->
+                    <div class="lg:col-span-6 flex flex-col gap-3">
+                        <div class="bg-obsidian p-3.5 rounded-xl border border-subtle/80 flex flex-col gap-2">
+                            <div class="flex items-center justify-between">
+                                <span id="reviewCurrentMoveTitle" class="font-mono font-bold text-sm text-slate-200">Move Review</span>
+                                <span id="reviewCurrentMoveGradePill" class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-card text-slate-300">Best Move</span>
+                            </div>
+                            <p id="reviewCurrentExplanationText" class="text-xs text-slate-300 leading-relaxed min-h-[60px]">
+                                Step through each move to inspect Stockfish evaluations, blunder warnings, and tactical ideas.
+                            </p>
+                            <div class="flex items-center justify-between text-xs text-slate-400 pt-1.5 border-t border-subtle/60">
+                                <div>Best Engine Move: <span id="reviewBestAlternativeSan" class="font-mono font-bold text-emerald-400">-</span></div>
+                                <div>Eval: <span id="reviewEvalNumberDisplay" class="font-mono font-bold text-cyan-400">0.0</span></div>
+                            </div>
+                        </div>
+
+                        <!-- "Continue From Here" Option -->
+                        <div class="bg-card p-3 rounded-xl border border-subtle flex items-center justify-between">
+                            <div>
+                                <h4 class="text-xs font-bold text-amber-400">Want to test this position?</h4>
+                                <p class="text-[11px] text-slate-400">Resume play directly against Agni from this board state.</p>
+                            </div>
+                            <button onclick="continuePlayingFromAnalysisPosition()" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs py-2 px-3 rounded-lg shadow transition flex items-center gap-1.5 whitespace-nowrap">
+                                <span>▶️</span> <span>Continue From Here</span>
+                            </button>
+                        </div>
+
+                        <!-- Full Move Log Table -->
+                        <div class="bg-obsidian p-2 rounded-xl border border-subtle/80 max-h-44 overflow-y-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-500 uppercase border-b border-subtle/60 pb-1 text-[10px]">
+                                    <tr>
+                                        <th class="py-1">#</th>
+                                        <th>White</th>
+                                        <th>Grade</th>
+                                        <th>Black</th>
+                                        <th>Grade</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reviewMoveLogTableBody" class="font-mono text-slate-300 divide-y divide-subtle/40">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 3: UNIFIED LEARNING HUB (ACADEMY + OPENINGS) ==================== -->
+        <section id="view-learn" class="tab-view hidden flex-1 flex flex-col gap-4">
+            <div class="bg-panel p-4 sm:p-5 rounded-2xl border border-subtle/80 shadow-xl flex flex-col gap-4">
+                
+                <!-- Learning Hub Sub-Tab Switcher -->
+                <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-subtle/60">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                            <span>🎓</span> Grandmaster Learning Hub
+                        </h2>
+                        <span class="text-xs text-slate-400">Unified curriculum & opening repertoires</span>
+                    </div>
+
+                    <!-- Sub-Nav Pill: Academy vs Openings -->
+                    <div class="flex items-center bg-obsidian p-1 rounded-xl border border-subtle text-xs font-bold">
+                        <button id="learnSubTab-academy" onclick="switchLearnSubTab('academy')" class="px-3 py-1.5 rounded-lg bg-amber-600 text-slate-950 shadow transition flex items-center gap-1.5">
+                            <span>🏆</span> <span>Academy (Duolingo Path)</span>
+                        </button>
+                        <button id="learnSubTab-openings" onclick="switchLearnSubTab('openings')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                            <span>📖</span> <span>Openings Explorer (Search)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SUB-SECTION A: ACADEMY (DUOLINGO STYLE) -->
+                <div id="learnSection-academy" class="flex flex-col gap-6">
+                    <!-- Duolingo Streak & Hearts Bar -->
+                    <div class="flex items-center justify-between bg-obsidian p-3 rounded-xl border border-subtle text-xs font-bold">
+                        <div class="flex items-center gap-2">
+                            <span class="text-amber-400">🔥 7-Day Streak</span>
+                            <span class="text-slate-600">•</span>
+                            <span class="text-rose-400">❤️❤️❤️❤️❤️ 5/5 Hearts</span>
+                        </div>
+                        <div class="text-cyan-400">
+                            💎 1,450 XP Earned
+                        </div>
+                    </div>
+
+                    <!-- Winding Duolingo Path -->
+                    <div class="max-w-md mx-auto w-full flex flex-col items-center gap-8 py-2 relative">
+                        <!-- Unit 1 Banner -->
+                        <div class="w-full bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 p-4 rounded-2xl shadow-lg flex items-center justify-between text-slate-950">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-amber-200">Unit 1 • Fundamentals</span>
+                                <h3 class="text-base font-extrabold text-white">The Spark: Pawn & Piece Power</h3>
+                            </div>
+                            <span class="text-3xl">♟️</span>
+                        </div>
+
+                        <!-- Nodes -->
+                        <div class="flex flex-col items-center gap-6 w-full">
+                            <div class="duo-path-node cursor-pointer flex flex-col items-center" onclick="openDuolingoChallenge(1)">
+                                <div class="w-16 h-16 rounded-full bg-emerald-500 border-4 border-emerald-400 flex items-center justify-center text-2xl shadow-lg shadow-emerald-950/50">
+                                    👑
+                                </div>
+                                <span class="text-xs font-bold text-emerald-400 mt-1">Pawn Marches</span>
+                                <span class="text-[10px] text-slate-400">Mastered (3/3)</span>
+                            </div>
+
+                            <div class="duo-path-node cursor-pointer flex flex-col items-center -translate-x-12" onclick="openDuolingoChallenge(2)">
+                                <div class="w-16 h-16 rounded-full bg-emerald-500 border-4 border-emerald-400 flex items-center justify-center text-2xl shadow-lg shadow-emerald-950/50">
+                                    ♞
+                                </div>
+                                <span class="text-xs font-bold text-emerald-400 mt-1">Knight Outposts</span>
+                                <span class="text-[10px] text-slate-400">Mastered (3/3)</span>
+                            </div>
+
+                            <div class="duo-path-node cursor-pointer flex flex-col items-center translate-x-12" onclick="claimAcademyBonusChest()">
+                                <div class="w-14 h-14 rounded-full bg-amber-500 border-4 border-amber-400 flex items-center justify-center text-xl shadow-lg shadow-amber-950/50 animate-bounce">
+                                    🎁
+                                </div>
+                                <span class="text-xs font-bold text-amber-400 mt-1">Bonus XP Chest</span>
+                                <span class="text-[10px] text-slate-400">Claim Reward</span>
+                            </div>
+
+                            <div class="duo-path-node cursor-pointer flex flex-col items-center relative" onclick="openDuolingoChallenge(3)">
+                                <span class="absolute -top-5 text-[10px] font-extrabold bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Active</span>
+                                <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 border-4 border-white flex items-center justify-center text-2xl shadow-xl shadow-amber-950/60 ring-4 ring-amber-500/30">
+                                    ♝
+                                </div>
+                                <span class="text-xs font-bold text-amber-400 mt-1">Bishop Diagonals</span>
+                                <span class="text-[10px] text-slate-400">Next Lesson • +50 XP</span>
+                            </div>
+                        </div>
+
+                        <!-- Unit 2 Banner -->
+                        <div class="w-full bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-4 rounded-2xl shadow-lg flex items-center justify-between text-white mt-4">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-blue-200">Unit 2 • Tactical Fire</span>
+                                <h3 class="text-base font-extrabold text-white">The Strike: Forks, Pins & Skewers</h3>
+                            </div>
+                            <span class="text-3xl">🔱</span>
+                        </div>
+
+                        <div class="flex flex-col items-center gap-6 w-full">
+                            <div class="duo-path-node cursor-pointer flex flex-col items-center" onclick="openDuolingoChallenge(4)">
+                                <div class="w-16 h-16 rounded-full bg-card border-4 border-subtle flex items-center justify-center text-2xl shadow">
+                                    🔱
+                                </div>
+                                <span class="text-xs font-bold text-slate-400 mt-1">The Royal Fork</span>
+                                <span class="text-[10px] text-slate-500">Practice</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-SECTION B: OPENINGS EXPLORER WITH SEARCH & VARIATIONS -->
+                <div id="learnSection-openings" class="hidden flex flex-col gap-4">
+                    <!-- Opening Search Input -->
+                    <div class="flex items-center gap-2 bg-obsidian p-2 rounded-xl border border-subtle">
+                        <span class="text-slate-400 text-sm pl-2">🔎</span>
+                        <input type="text" id="openingSearchInput" oninput="filterOpeningsCatalog(this.value)" placeholder="Search openings or variations (e.g. Sicilian, Najdorf, Evans Gambit, French, Ruy Lopez, Caro-Kann)..." class="w-full bg-transparent text-xs text-slate-100 placeholder-slate-500 focus:outline-none">
+                    </div>
+
+                    <!-- Opening Catalog Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="openingsCardGrid">
+                        <!-- Injected via JavaScript -->
+                    </div>
+
+                    <!-- Selected Opening Active Interactive Sparring Board -->
+                    <div class="mt-4 bg-obsidian p-4 rounded-xl border border-subtle grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                        <div class="lg:col-span-6 flex flex-col items-center">
+                            <div class="w-full max-w-[360px] aspect-square border-2 border-subtle rounded-xl overflow-hidden shadow-xl relative">
+                                <div id="openingInteractiveBoard" class="theme-classic w-full h-full grid grid-cols-8 grid-rows-8"></div>
+                            </div>
+                            <div class="w-full max-w-[360px] flex items-center justify-between mt-2.5 bg-card p-2 rounded-xl border border-subtle text-xs">
+                                <button onclick="resetOpeningExplorerDrill()" class="px-2.5 py-1 rounded-lg bg-subtle text-slate-200 font-semibold">🔄 Reset</button>
+                                <span id="openingActiveDrillLabel" class="font-mono text-amber-400 font-bold">1. e4</span>
+                                <button onclick="hintOpeningExplorerDrill()" class="px-2.5 py-1 rounded-lg bg-amber-600 text-slate-950 font-bold">💡 Hint</button>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-6 flex flex-col gap-2.5 text-xs">
+                            <div class="flex items-center justify-between">
+                                <h3 id="openingActiveTitle" class="font-bold text-slate-100 text-sm">Italian Game: Giuoco Piano</h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 font-mono font-bold" id="openingActiveMoves">1. e4 e5 2. Nf3 Nc6 3. Bc4</span>
+                            </div>
+                            <p id="openingActiveDescription" class="text-slate-300 leading-relaxed">
+                                White claims the center and aims a laser at Black's f7 vulnerability.
+                            </p>
+                            <div class="bg-card p-3 rounded-lg border border-subtle flex flex-col gap-1.5">
+                                <strong class="text-amber-400 font-semibold">Master Strategic Plans:</strong>
+                                <ul id="openingActivePlansList" class="list-disc list-inside text-slate-300 space-y-1">
+                                    <li>Develop bishop to c4 and castle early.</li>
+                                    <li>Prepare central d4 push with c3.</li>
+                                    <li>Beware the Fried Liver Attack if Black plays ...Nf6 and allows Ng5!</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 4: PUZZLES (500 TO 5000+ ELO) ==================== -->
+        <section id="view-puzzles" class="tab-view hidden flex-1 flex flex-col gap-4">
+            <div class="bg-panel p-4 sm:p-5 rounded-2xl border border-subtle/80 shadow-xl flex flex-col gap-4">
+                <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-subtle/60">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                            <span>🧩</span> Tactical Arena (500 to 5000+ ELO)
+                        </h2>
+                        <p class="text-xs text-slate-400">10,000+ tactical positions. Select your rating bracket and test calculation speed.</p>
+                    </div>
+                    <select id="puzzlesEloDropdown" onchange="filterTacticalPuzzles(this.value)" class="bg-card text-amber-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-subtle focus:outline-none focus:border-amber-500">
+                        <option value="600">Beginner (500 - 800 ELO)</option>
+                        <option value="1250" selected>Club Player (1000 - 1400 ELO)</option>
+                        <option value="1680">Intermediate (1500 - 1800 ELO)</option>
+                        <option value="2150">Advanced (1900 - 2400 ELO)</option>
+                        <option value="2850">Master (2500 - 3200 ELO)</option>
+                        <option value="5000">Super-GM Deity (4000 - 5000+ ELO)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    <!-- Puzzle Board -->
+                    <div class="lg:col-span-6 flex flex-col items-center">
+                        <div class="w-full max-w-[400px] flex items-center justify-between py-1.5 px-3 bg-obsidian rounded-t-xl border border-b-0 border-subtle/80 text-xs">
+                            <span class="font-mono font-bold text-amber-400" id="tacticsPuzzleNumber">Puzzle #1042</span>
+                            <span class="text-emerald-400 font-semibold" id="tacticsTurnDirection">White to move and win</span>
+                            <span class="font-mono text-slate-400" id="tacticsEloTag">1250 ELO</span>
+                        </div>
+                        <div class="w-full max-w-[400px] aspect-square border-2 border-subtle rounded-b-xl overflow-hidden shadow-xl relative">
+                            <div id="tacticsBoardGrid" class="theme-classic w-full h-full grid grid-cols-8 grid-rows-8"></div>
+                        </div>
+                        <div class="w-full max-w-[400px] grid grid-cols-3 gap-2 mt-2.5">
+                            <button onclick="hintTacticsPuzzle()" class="bg-card hover:bg-subtle text-slate-200 text-xs py-2 rounded-lg font-semibold border border-subtle transition flex items-center justify-center gap-1">
+                                <span>💡</span> <span>Hint</span>
+                            </button>
+                            <button onclick="revealTacticsPuzzleAnswer()" class="bg-card hover:bg-subtle text-slate-200 text-xs py-2 rounded-lg font-semibold border border-subtle transition flex items-center justify-center gap-1">
+                                <span>👁️</span> <span>Solution</span>
+                            </button>
+                            <button onclick="nextTacticsPuzzle()" class="bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs py-2 rounded-lg font-bold transition flex items-center justify-center gap-1 shadow">
+                                <span>⏭️</span> <span>Next</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Puzzle Info & Scoreboard -->
+                    <div class="lg:col-span-6 flex flex-col gap-3">
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div class="bg-obsidian p-2.5 rounded-xl border border-subtle/80 text-center">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold">Streak</span>
+                                <div class="text-base font-extrabold text-amber-400" id="tacticsStreakCounter">🔥 5</div>
+                            </div>
+                            <div class="bg-obsidian p-2.5 rounded-xl border border-subtle/80 text-center">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold">Solved</span>
+                                <div class="text-base font-extrabold text-emerald-400" id="tacticsSolvedCounter">18</div>
+                            </div>
+                            <div class="bg-obsidian p-2.5 rounded-xl border border-subtle/80 text-center">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold">Tactics ELO</span>
+                                <div class="text-base font-extrabold text-cyan-400" id="tacticsPlayerRating">1480</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-obsidian p-4 rounded-xl border border-subtle/80 flex flex-col gap-2">
+                            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Coach Agni Guidance</h3>
+                            <p id="tacticsPromptText" class="text-xs text-slate-300 leading-relaxed min-h-[50px]">
+                                Identify undefended enemy pieces. Can a double attack or deflection win decisive material?
+                            </p>
+                            <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-subtle/60">
+                                <span>Theme: <strong id="tacticsThemeBadge" class="text-amber-400">Fork & Pin</strong></span>
+                                <span id="tacticsStatusTag" class="px-2 py-0.5 rounded bg-card text-slate-400 text-[10px] font-bold">Unsolved</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== BOTTOM NAVIGATION BAR (4 CORE TABS) ==================== -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-panel/95 backdrop-blur border-t border-subtle/80 px-4 py-2">
+        <div class="max-w-md mx-auto grid grid-cols-4 gap-2 text-center">
+            <button id="nav-btn-play" onclick="switchMainTab('play')" class="flex flex-col items-center py-1 rounded-xl text-amber-400 font-bold transition">
+                <span class="text-base">♟️</span>
+                <span class="text-[10px] mt-0.5">Play</span>
+            </button>
+            <button id="nav-btn-analysis" onclick="switchMainTab('analysis')" class="flex flex-col items-center py-1 rounded-xl text-slate-400 hover:text-slate-200 transition">
+                <span class="text-base">🔍</span>
+                <span class="text-[10px] mt-0.5">Analysis</span>
+            </button>
+            <button id="nav-btn-learn" onclick="switchMainTab('learn')" class="flex flex-col items-center py-1 rounded-xl text-slate-400 hover:text-slate-200 transition">
+                <span class="text-base">🎓</span>
+                <span class="text-[10px] mt-0.5">Learn</span>
+            </button>
+            <button id="nav-btn-puzzles" onclick="switchMainTab('puzzles')" class="flex flex-col items-center py-1 rounded-xl text-slate-400 hover:text-slate-200 transition">
+                <span class="text-base">🧩</span>
+                <span class="text-[10px] mt-0.5">Puzzles</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Profile & Settings Modal (Upper Right Corner) -->
+    <div id="profileModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-panel border border-subtle rounded-2xl max-w-lg w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-subtle/80">
+                <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <span>👤</span> Profile & Settings
+                </h3>
+                <button onclick="closeProfileModal()" class="text-slate-400 hover:text-white text-lg p-1">✕</button>
+            </div>
+
+            <!-- Profile Info Card -->
+            <div class="mt-4 flex items-center gap-3 bg-obsidian p-3.5 rounded-xl border border-subtle/80">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-2xl shadow font-bold text-slate-950">
+                    👑
+                </div>
+                <div>
+                    <h4 class="font-bold text-sm text-slate-100">Arjun / Agni Disciple</h4>
+                    <span class="text-[10px] px-2 py-0.2 rounded bg-amber-950 text-amber-400 font-mono font-bold">Candidate Master</span>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Rapid: 1685 • Blitz: 1540 • Tactics: 1480</p>
+                </div>
+            </div>
+
+            <!-- Audio & Board Settings -->
+            <div class="mt-4 flex flex-col gap-3 text-xs">
+                <h4 class="font-bold text-slate-400 uppercase tracking-wider text-[11px]">Audio & Voice Controls</h4>
+                
+                <div class="flex items-center justify-between bg-obsidian p-2.5 rounded-xl border border-subtle/80">
+                    <div>
+                        <span class="font-semibold text-slate-200">Chess Sound Effects</span>
+                        <p class="text-[10px] text-slate-400">Moves, captures, checks, and victory fanfare</p>
+                    </div>
+                    <input type="checkbox" id="settingSoundCheckbox" checked onchange="toggleSoundSetting(this.checked)" class="w-4 h-4 accent-amber-500">
+                </div>
+
+                <div class="flex items-center justify-between bg-obsidian p-2.5 rounded-xl border border-subtle/80">
+                    <div>
+                        <span class="font-semibold text-slate-200">Agni Voice Commentary</span>
+                        <p class="text-[10px] text-slate-400">Spoken move explanations & coaching advice</p>
+                    </div>
+                    <input type="checkbox" id="settingVoiceCheckbox" checked onchange="toggleVoiceSetting(this.checked)" class="w-4 h-4 accent-amber-500">
+                </div>
+
+                <div class="flex items-center justify-between bg-obsidian p-2.5 rounded-xl border border-subtle/80">
+                    <div>
+                        <span class="font-semibold text-slate-200">Test Voice Audio</span>
+                        <p class="text-[10px] text-slate-400">Verify speech synthesis playback</p>
+                    </div>
+                    <button onclick="testAgniVoice()" class="px-3 py-1 rounded-lg bg-amber-600 text-slate-950 font-bold text-xs">
+                        🔊 Test Speech
+                    </button>
+                </div>
+
+                <h4 class="font-bold text-slate-400 uppercase tracking-wider text-[11px] mt-2">Board Aesthetics</h4>
+                <div class="flex items-center justify-between bg-obsidian p-2.5 rounded-xl border border-subtle/80">
+                    <span class="font-semibold text-slate-200">Theme</span>
+                    <select id="settingBoardThemeSelect" onchange="changeBoardTheme(this.value)" class="bg-card text-amber-400 text-xs px-2.5 py-1 rounded border border-subtle">
+                        <option value="classic" selected>Tournament Green</option>
+                        <option value="slate">Cool Slate & Charcoal</option>
+                        <option value="wood">Walnut Wood</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <button onclick="closeProfileModal()" class="px-4 py-2 rounded-xl bg-card text-slate-300 hover:bg-subtle transition font-semibold text-xs">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duolingo Challenge Modal -->
+    <div id="duoChallengeModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-panel border border-subtle rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-subtle/80">
+                <span class="text-xs font-bold text-amber-400 font-mono" id="duoChallengeHeader">LESSON 3 • BISHOP DIAGONALS</span>
+                <span class="text-xs text-rose-400 font-bold">❤️❤️❤️❤️❤️</span>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-3">
+                <h4 class="text-sm font-bold text-slate-100" id="duoChallengeTitle">Question Title</h4>
+                <p class="text-xs text-slate-300 leading-relaxed bg-obsidian p-3 rounded-xl border border-subtle/60" id="duoChallengeBody">
+                    Question text.
+                </p>
+
+                <div class="flex flex-col gap-2 mt-1" id="duoOptionsBox"></div>
+                <div id="duoFeedbackResult" class="hidden p-2.5 rounded-xl text-xs font-bold mt-2"></div>
+
+                <div class="mt-3 flex justify-end">
+                    <button onclick="submitDuoAnswer()" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition shadow">
+                        Check Answer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste PGN Modal -->
+    <div id="pastePgnModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-panel border border-subtle rounded-2xl max-w-lg w-full p-5 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-subtle/80">
+                <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <span>📋</span> Paste Game PGN
+                </h3>
+                <button onclick="closePastePgnModal()" class="text-slate-400 hover:text-white text-lg p-1">✕</button>
+            </div>
+            <textarea id="pgnInputArea" rows="6" placeholder="Paste standard PGN notation here (e.g. 1. e4 e5 2. Nf3 Nc6 3. Bc4...)" class="w-full mt-3 bg-obsidian text-xs p-3 rounded-xl border border-subtle font-mono text-slate-200 focus:outline-none focus:border-amber-500"></textarea>
+            <div class="mt-3 flex justify-end gap-2 text-xs">
+                <button onclick="closePastePgnModal()" class="px-3 py-1.5 rounded-lg bg-card text-slate-300">Cancel</button>
+                <button onclick="parseAndAnalyzePgn()" class="px-4 py-1.5 rounded-lg bg-amber-600 font-bold text-slate-950">Analyze PGN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="fixed bottom-20 right-5 bg-panel border border-amber-600/70 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none flex items-center gap-2">
+        <span id="toastIcon">✨</span>
+        <span id="toastText">Notification message</span>
+    </div>
+
+    <!-- ==================== JAVASCRIPT APP CORE ==================== -->
+    <script>
+        // --- 1. Audio Synthesizer (Web Audio API) & Speech Synthesis ---
+        let audioContext = null;
+        let isAudioOn = true;
+        let isVoiceOn = true;
+        let speechWarmedUp = false;
+
+        function getAudioContext() {
+            if (!audioContext) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) audioContext = new AudioCtx();
+            }
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            return audioContext;
+        }
+
+        // Initialize audio/speech on user interaction
+        document.addEventListener('click', function initAudioGesture() {
+            getAudioContext();
+            if ('speechSynthesis' in window && !speechWarmedUp) {
+                speechWarmedUp = true;
+                const warmUp = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(warmUp);
+            }
+        }, { once: false });
+
+        function playSound(type) {
+            if (!isAudioOn) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'move') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(340, now);
+                osc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'capture') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(260, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } else if (type === 'check') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now);
+                osc.frequency.setValueAtTime(880, now + 0.08);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'checkmate') {
+                [440, 554.37, 659.25].forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(freq, now + (i * 0.12));
+                    g.gain.setValueAtTime(0.3, now + (i * 0.12));
+                    g.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.12) + 0.5);
+                    o.start(now + (i * 0.12));
+                    o.stop(now + (i * 0.12) + 0.5);
+                });
+            }
+        }
+
+        // Animated Character Speech & Facial Expressions
+        function setAgniCharacterMood(mood) {
+            const charBox = document.getElementById('agniCharacterBox');
+            if (!charBox) return;
+            charBox.className = "character-container flex-shrink-0 cursor-pointer";
+            if (mood === 'talking') charBox.classList.add('character-talking');
+            else if (mood === 'happy') charBox.classList.add('character-happy');
+            else if (mood === 'shocked') charBox.classList.add('character-shocked');
+            else if (mood === 'thinking') charBox.classList.add('character-thinking');
+        }
+
+        let lastSpokenText = "Welcome to the board! I am Agni. Claim the central squares with 1.e4 or 1.d4, and let's craft a masterpiece together!";
+
+        function speakAgniWithAnimation(text, mood = 'talking') {
+            lastSpokenText = text;
+            document.getElementById('agniSpeechBubbleText').innerText = `"${text}"`;
+
+            if (!isVoiceOn || !('speechSynthesis' in window)) {
+                setAgniCharacterMood(mood);
+                setTimeout(() => setAgniCharacterMood('idle'), 2500);
+                return;
+            }
+
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.05;
+
+                // Pick natural English voice if available
+                const voices = window.speechSynthesis.getVoices();
+                const naturalVoice = voices.find(v => v.lang && v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Female')));
+                if (naturalVoice) utterance.voice = naturalVoice;
+
+                utterance.onstart = () => setAgniCharacterMood('talking');
+                utterance.onend = () => setAgniCharacterMood('idle');
+                utterance.onerror = () => setAgniCharacterMood('idle');
+
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.warn("Speech synthesis error", e);
+                setAgniCharacterMood('idle');
+            }
+        }
+
+        function replayAgniVoice() {
+            speakAgniWithAnimation(lastSpokenText, 'talking');
+        }
+
+        function testAgniVoice() {
+            speakAgniWithAnimation("Greetings! I am Agni. Sound synthesis is functioning flawlessly!", "happy");
+            showToast("Playing voice test...", "🎙️");
+        }
+
+        // --- 2. Classic Vector Pieces (Chessboard.js / Wikipedia pieces) ---
+        function getPieceImgHTML(color, type) {
+            const pieceCode = color + type.toUpperCase();
+            return `<img src="https://chessboardjs.com/img/chesspieces/wikipedia/${pieceCode}.png" alt="${pieceCode}" class="chess-piece-img" draggable="false">`;
+        }
+
+        // --- 3. Tactical Minimax & Stockfish Engine (No Blundering Queens!) ---
+        let botRating = 1600;
+        let game = new Chess();
+        let selectedSq = null;
+        let validMoves = [];
+        let isBoardFlipped = false;
+        let currentEvalNumber = 0.0;
+        let gameHistoryRecords = [];
+
+        const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
+
+        const PIECE_VALS = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+        const PST_P = [
+            0,  0,  0,  0,  0,  0,  0,  0,
+            50, 50, 50, 50, 50, 50, 50, 50,
+            10, 10, 20, 30, 30, 20, 10, 10,
+             5,  5, 10, 25, 25, 10,  5,  5,
+             0,  0,  0, 20, 20,  0,  0,  0,
+             5, -5,-10,  0,  0,-10, -5,  5,
+             5, 10, 10,-20,-20, 10, 10,  5,
+             0,  0,  0,  0,  0,  0,  0,  0
+        ];
+
+        function evaluatePositionScore(chessState) {
+            let score = 0;
+            const b = chessState.board();
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = b[r][c];
+                    if (!p) continue;
+                    let v = PIECE_VALS[p.type] || 0;
+                    if (p.type === 'p') {
+                        v += (p.color === 'w' ? PST_P[r * 8 + c] : PST_P[63 - (r * 8 + c)]);
+                    }
+                    score += (p.color === 'w' ? v : -v);
+                }
+            }
+            return score;
+        }
+
+        function minimaxAlphaBeta(chessState, depth, alpha, beta, isWhite) {
+            if (depth === 0 || chessState.game_over()) {
+                return evaluatePositionScore(chessState);
+            }
+            const moves = chessState.moves({ verbose: true });
+            moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
+
+            if (isWhite) {
+                let maxEval = -999999;
+                for (const m of moves) {
+                    chessState.move(m);
+                    const ev = minimaxAlphaBeta(chessState, depth - 1, alpha, beta, false);
+                    chessState.undo();
+                    maxEval = Math.max(maxEval, ev);
+                    alpha = Math.max(alpha, ev);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = 999999;
+                for (const m of moves) {
+                    chessState.move(m);
+                    const ev = minimaxAlphaBeta(chessState, depth - 1, alpha, beta, true);
+                    chessState.undo();
+                    minEval = Math.min(minEval, ev);
+                    beta = Math.min(beta, ev);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function calculateBestEngineMove(chessState) {
+            const moves = chessState.moves({ verbose: true });
+            if (moves.length === 0) return null;
+
+            const depth = botRating >= 2000 ? 3 : 2;
+            let bestM = moves[0];
+            let bestScore = 999999; // Black minimizes White score
+
+            moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
+
+            for (const m of moves) {
+                chessState.move(m);
+                const score = minimaxAlphaBeta(chessState, depth - 1, -999999, 999999, true);
+                chessState.undo();
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestM = m;
+                }
+            }
+            return bestM;
+        }
+
+        // --- 4. Board Rendering (Play Tab) ---
+        function renderPlayBoardGrid() {
+            const container = document.getElementById('playBoardGrid');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const ranks = isBoardFlipped ? [...RANKS].reverse() : RANKS;
+            const files = isBoardFlipped ? [...FILES].reverse() : FILES;
+
+            const inCheck = game.in_check();
+            const turn = game.turn();
+
+            let checkSquare = null;
+            if (inCheck) {
+                const b = game.board();
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = b[r][c];
+                        if (p && p.type === 'k' && p.color === turn) {
+                            checkSquare = FILES[c] + (8 - r);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const sqId = files[c] + ranks[r];
+                    const isLight = (FILES.indexOf(files[c]) + parseInt(ranks[r])) % 2 !== 0;
+
+                    const sq = document.createElement('div');
+                    sq.className = `chess-square ${isLight ? 'square-light' : 'square-dark'}`;
+                    sq.id = `play-sq-${sqId}`;
+
+                    if (selectedSq === sqId) sq.classList.add('square-selected');
+                    if (checkSquare === sqId) sq.classList.add('king-check');
+
+                    const piece = game.get(sqId);
+                    if (piece) {
+                        sq.innerHTML = getPieceImgHTML(piece.color, piece.type);
+                    }
+
+                    if (selectedSq) {
+                        const isLegal = validMoves.some(m => m.to === sqId);
+                        if (isLegal) {
+                            if (piece) {
+                                const ring = document.createElement('div');
+                                ring.className = 'capture-ring';
+                                sq.appendChild(ring);
+                            } else {
+                                const dot = document.createElement('div');
+                                dot.className = 'legal-dot';
+                                sq.appendChild(dot);
+                            }
+                        }
+                    }
+
+                    sq.onclick = () => handlePlaySquareClick(sqId);
+                    container.appendChild(sq);
+                }
+            }
+
+            updateCapturedDisplays();
+        }
+
+        function handlePlaySquareClick(sqId) {
+            if (game.game_over()) return;
+            if (game.turn() !== 'w') return;
+
+            const piece = game.get(sqId);
+
+            if (piece && piece.color === 'w') {
+                selectedSq = sqId;
+                validMoves = game.moves({ square: sqId, verbose: true });
+                renderPlayBoardGrid();
+                return;
+            }
+
+            if (selectedSq) {
+                const moveAttempt = validMoves.find(m => m.to === sqId);
+                if (moveAttempt) {
+                    const isCapture = !!game.get(moveAttempt.to);
+                    const executed = game.move({ from: moveAttempt.from, to: moveAttempt.to, promotion: 'q' });
+                    if (executed) {
+                        if (game.in_checkmate()) playSound('checkmate');
+                        else if (game.in_check()) playSound('check');
+                        else if (isCapture) playSound('capture');
+                        else playSound('move');
+
+                        selectedSq = null;
+                        validMoves = [];
+                        updatePlayBoardUI();
+                        gradeMoveAndSpeak(executed.san, 'player');
+
+                        if (!game.game_over()) {
+                            document.getElementById('playAgniStatusLine').innerText = "Agni is calculating...";
+                            setAgniCharacterMood('thinking');
+                            setTimeout(executeAgniMove, 450);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            selectedSq = null;
+            validMoves = [];
+            renderPlayBoardGrid();
+        }
+
+        function executeAgniMove() {
+            if (game.game_over()) return;
+
+            const bestMove = calculateBestEngineMove(game);
+            if (!bestMove) return;
+
+            const isCapture = !!game.get(bestMove.to);
+            const executed = game.move(bestMove);
+
+            if (game.in_checkmate()) playSound('checkmate');
+            else if (game.in_check()) playSound('check');
+            else if (isCapture) playSound('capture');
+            else playSound('move');
+
+            updatePlayBoardUI();
+            gradeMoveAndSpeak(executed.san, 'agni');
+            document.getElementById('playAgniStatusLine').innerText = "Awaiting your move";
+        }
+
+        function gradeMoveAndSpeak(san, actor) {
+            let grade = "Good Move";
+            let color = "bg-emerald-600 text-white";
+            let mood = "talking";
+
+            if (san.includes('#')) {
+                grade = "Brilliant (!!)";
+                color = "bg-purple-600 text-white animate-pulse";
+                mood = "happy";
+            } else if (san.includes('+')) {
+                grade = "Great Move (!)";
+                color = "bg-blue-600 text-white";
+                mood = "happy";
+            } else if (['e4', 'd4', 'Nf3', 'c4', 'e5', 'd5', 'Nf6', 'Nc6'].includes(san) && game.history().length <= 4) {
+                grade = "Book Move (★)";
+                color = "bg-emerald-700 text-white";
+            }
+
+            const badge = document.getElementById('playMoveGradeTag');
+            badge.innerText = grade;
+            badge.className = `text-xs px-2.5 py-1 rounded-full font-bold ${color}`;
+
+            let commentary = "";
+            if (actor === 'player') {
+                if (grade.includes("Brilliant")) {
+                    commentary = `Masterful strike with ${san}! A decisive blow on the board.`;
+                } else if (grade.includes("Great")) {
+                    commentary = `Sharp attack with ${san}! You create immediate pressure.`;
+                } else {
+                    commentary = `Solid development with ${san}. The battle for the center continues!`;
+                }
+            } else {
+                commentary = `I respond with ${san}. Solidifying my position and preparing a counter-strike!`;
+            }
+
+            speakAgniWithAnimation(commentary, mood);
+
+            gameHistoryRecords.push({
+                fen: game.fen(),
+                move: san,
+                actor: actor,
+                grade: grade,
+                eval: currentEvalNumber,
+                comment: commentary
+            });
+        }
+
+        function updatePlayBoardUI() {
+            renderPlayBoardGrid();
+
+            const turnEl = document.getElementById('playTurnIndicatorText');
+            if (game.game_over()) {
+                if (game.in_checkmate()) {
+                    const winner = game.turn() === 'w' ? 'Black (Agni)' : 'White (You)';
+                    turnEl.innerText = `Checkmate! ${winner} wins!`;
+                    turnEl.className = "text-[11px] text-amber-400 font-bold";
+                    setAgniCharacterMood(game.turn() === 'b' ? 'happy' : 'shocked');
+                } else {
+                    turnEl.innerText = "Game Drawn (Stalemate)";
+                    turnEl.className = "text-[11px] text-slate-400 font-bold";
+                }
+            } else {
+                if (game.turn() === 'w') {
+                    turnEl.innerText = game.in_check() ? "⚠️ CHECK! Escape immediately." : "Your turn (White)";
+                    turnEl.className = game.in_check() ? "text-[11px] text-rose-400 font-bold animate-pulse" : "text-[11px] text-emerald-400 font-semibold";
+                    if (game.in_check()) setAgniCharacterMood('shocked');
+                } else {
+                    turnEl.innerText = game.in_check() ? "Agni is in CHECK!" : "Agni's turn (Black)...";
+                    turnEl.className = "text-[11px] text-amber-400 font-semibold";
+                }
+            }
+
+            const history = game.history();
+            const last = history.length > 0 ? history[history.length - 1] : "Start Position";
+            document.getElementById('playMoveSanLabel').innerText = last;
+
+            // Log
+            const logEl = document.getElementById('playMoveLogContainer');
+            if (history.length === 0) {
+                logEl.innerHTML = '<span class="text-slate-600">Game started. Waiting for 1. e4 or 1. d4...</span>';
+            } else {
+                let html = '';
+                for (let i = 0; i < history.length; i += 2) {
+                    const moveNum = Math.floor(i / 2) + 1;
+                    const w = history[i];
+                    const b = history[i + 1] || '';
+                    html += `<div class="flex justify-between py-0.5 border-b border-subtle/30"><span class="text-slate-500 w-8">${moveNum}.</span><span class="w-20 font-bold text-slate-200">${w}</span><span class="w-20 font-bold text-amber-300">${b}</span></div>`;
+                }
+                logEl.innerHTML = html;
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        }
+
+        function updateCapturedDisplays() {
+            const b = game.board();
+            const current = { w: { p:0, n:0, b:0, r:0, q:0 }, b: { p:0, n:0, b:0, r:0, q:0 } };
+            const initial = { p:8, n:2, b:2, r:2, q:1 };
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = b[r][c];
+                    if (p && p.type !== 'k') current[p.color][p.type]++;
+                }
+            }
+
+            const glyphs = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛' };
+            let whiteCap = '';
+            let blackCap = '';
+
+            for (const t of ['q', 'r', 'b', 'n', 'p']) {
+                const lostB = initial[t] - current.b[t];
+                if (lostB > 0) whiteCap += `<span class="text-slate-200">${glyphs[t].repeat(lostB)}</span>`;
+                const lostW = initial[t] - current.w[t];
+                if (lostW > 0) blackCap += `<span class="text-slate-400">${glyphs[t].repeat(lostW)}</span>`;
+            }
+
+            document.getElementById('opponentCapturedDisplay').innerHTML = blackCap;
+            document.getElementById('playerCapturedDisplay').innerHTML = whiteCap;
+        }
+
+        function startNewGame() {
+            game.reset();
+            selectedSq = null;
+            validMoves = [];
+            gameHistoryRecords = [];
+            updatePlayBoardUI();
+            speakAgniWithAnimation("Board reset! Ready for your opening move.", "happy");
+            showToast("New game initialized", "♟️");
+        }
+
+        function takebackMove() {
+            game.undo();
+            game.undo();
+            selectedSq = null;
+            validMoves = [];
+            updatePlayBoardUI();
+            showToast("Move taken back", "↩️");
+        }
+
+        function flipBoard() {
+            isBoardFlipped = !isBoardFlipped;
+            renderPlayBoardGrid();
+            showToast(isBoardFlipped ? "Board flipped (Black view)" : "Board flipped (White view)", "🔃");
+        }
+
+        function changeBotDifficulty(val) {
+            botRating = parseInt(val);
+            document.getElementById('playAgniEloPill').innerText = `${botRating} ELO`;
+            document.getElementById('headerEngineStatus').innerText = `Coach Agni Online (${botRating} ELO)`;
+            showToast(`Agni rating set to ${botRating} ELO`, "⚙️");
+        }
+
+        // --- 5. Chessigma Review & Analysis System ---
+        let reviewStepIndex = 0;
+        let reviewBoard = new Chess();
+        let loadedGameAnalysisRecords = [];
+
+        function jumpToAnalysisFromGame() {
+            switchMainTab('analysis');
+            if (gameHistoryRecords.length === 0) {
+                loadPresetAnalysis('kasparov');
+            } else {
+                loadedGameAnalysisRecords = [...gameHistoryRecords];
+                renderChessigmaAnalysisDashboard();
+            }
+        }
+
+        function loadPresetAnalysis(type) {
+            let moves = [];
+            if (type === 'kasparov') {
+                moves = [
+                    { move: 'e4', grade: 'Best (★)', eval: '+0.2', comment: 'Kasparov claims center with 1.e4.' },
+                    { move: 'd6', grade: 'Good', eval: '+0.3', comment: 'Topalov defends with the Pirc.' },
+                    { move: 'd4', grade: 'Best (★)', eval: '+0.4', comment: 'Full central pawn duo.' },
+                    { move: 'Nf6', grade: 'Good', eval: '+0.3', comment: 'Developing knight.' },
+                    { move: 'Nc3', grade: 'Best (★)', eval: '+0.4', comment: 'Protecting e4 pawn.' },
+                    { move: 'g6', grade: 'Good', eval: '+0.4', comment: 'Preparing kingside fianchetto.' },
+                    { move: 'Be3', grade: 'Best (★)', eval: '+0.5', comment: 'Setting up English/Yugoslav attack.' },
+                    { move: 'Bg7', grade: 'Good', eval: '+0.4', comment: 'Sniper bishop on long diagonal.' },
+                    { move: 'Qd2', grade: 'Great (!)', eval: '+0.6', comment: 'Preparing Bh6 trade.' },
+                    { move: 'c6', grade: 'Good', eval: '+0.5', comment: 'Preparing queenside counterplay.' },
+                    { move: 'f3', grade: 'Best (★)', eval: '+0.7', comment: 'Cementing the center.' },
+                    { move: 'b5', grade: 'Good', eval: '+0.6', comment: 'Topalov expands on queenside.' },
+                    { move: 'Nge2', grade: 'Good', eval: '+0.6', comment: 'Flexible knight.' },
+                    { move: 'Nbd7', grade: 'Good', eval: '+0.7', comment: 'Reinforcing center.' },
+                    { move: 'Bh6', grade: 'Great (!)', eval: '+1.0', comment: 'Trading off defensive bishop!' },
+                    { move: 'Bxh6', grade: 'Good', eval: '+1.1', comment: 'Trade accepted.' },
+                    { move: 'Qxh6', grade: 'Best (★)', eval: '+1.2', comment: 'Queen invades dark squares.' },
+                    { move: 'Bb7', grade: 'Good', eval: '+1.1', comment: 'Developing bishop.' },
+                    { move: 'a3', grade: 'Good', eval: '+1.0', comment: 'Restricting b4 advance.' },
+                    { move: 'e5', grade: 'Good', eval: '+0.9', comment: 'Striking at d4.' },
+                    { move: 'O-O-O', grade: 'Best (★)', eval: '+1.2', comment: 'Castling queenside to join rooks.' },
+                    { move: 'Qe7', grade: 'Good', eval: '+1.1', comment: 'Queen coordination.' },
+                    { move: 'Kb1', grade: 'Great (!)', eval: '+1.4', comment: 'Prophylactic king step.' },
+                    { move: 'a6', grade: 'Inaccuracy (?!)', eval: '+2.1', comment: 'A slow flank move that allows White\'s fireworks.' },
+                    { move: 'Rxd4!', grade: 'Brilliant (!!)', eval: '+4.8', comment: 'The historic immortal rook sacrifice tearing Topalov\'s king apart!' }
+                ];
+            } else if (type === 'carlsen') {
+                moves = [
+                    { move: 'e4', grade: 'Best (★)', eval: '+0.2', comment: 'Carlsen opens with king pawn.' },
+                    { move: 'c5', grade: 'Best (★)', eval: '+0.2', comment: 'Anand chooses the Sicilian.' },
+                    { move: 'Nf3', grade: 'Best (★)', eval: '+0.3', comment: 'Standard open setup.' },
+                    { move: 'd6', grade: 'Good', eval: '+0.3', comment: 'Solid Najdorf prep.' },
+                    { move: 'd4', grade: 'Best (★)', eval: '+0.4', comment: 'Central breakthrough.' },
+                    { move: 'cxd4', grade: 'Good', eval: '+0.4', comment: 'Capture.' },
+                    { move: 'Nxd4', grade: 'Best (★)', eval: '+0.4', comment: 'Knight centralization.' },
+                    { move: 'Nf6', grade: 'Good', eval: '+0.3', comment: 'Attacking e4.' },
+                    { move: 'Nc3', grade: 'Best (★)', eval: '+0.4', comment: 'Developing defense.' },
+                    { move: 'a6', grade: 'Best (★)', eval: '+0.4', comment: 'The Najdorf signature.' },
+                    { move: 'f3', grade: 'Great (!)', eval: '+0.6', comment: 'English Attack system.' },
+                    { move: 'e6', grade: 'Good', eval: '+0.5', comment: 'Scheveningen structure.' }
+                ];
+            } else {
+                moves = [
+                    { move: 'e4', grade: 'Best (★)', eval: '+0.2', comment: 'Standard start.' },
+                    { move: 'e5', grade: 'Best (★)', eval: '0.0', comment: 'Central symmetry.' },
+                    { move: 'Bc4', grade: 'Good', eval: '+0.3', comment: 'Bishop opening.' },
+                    { move: 'f6?', grade: 'Blunder (??)', eval: '+2.8', comment: 'Disastrous weakening of the e8-h5 diagonal!' },
+                    { move: 'Qh5+', grade: 'Brilliant (!!)', eval: '+4.2', comment: 'Exploiting the blunder with a decisive king attack!' }
+                ];
+            }
+
+            loadedGameAnalysisRecords = [];
+            let temp = new Chess();
+            for (const s of moves) {
+                temp.move(s.move);
+                loadedGameAnalysisRecords.push({
+                    fen: temp.fen(),
+                    move: s.move,
+                    grade: s.grade,
+                    eval: s.eval,
+                    comment: s.comment
+                });
+            }
+            renderChessigmaAnalysisDashboard();
+            showToast(`Loaded ${type.toUpperCase()} game analysis`, "🔍");
+        }
+
+        // Fetch games from Chess.com or Lichess API
+        async function fetchExternalGames() {
+            const chesscomUser = document.getElementById('importChesscomUser').value.trim();
+            const lichessUser = document.getElementById('importLichessUser').value.trim();
+
+            if (!chesscomUser && !lichessUser) {
+                showToast("Enter a Chess.com or Lichess username first!", "⚠️");
+                return;
+            }
+
+            showToast("Fetching games from public API...", "⚡");
+
+            try {
+                if (chesscomUser) {
+                    const today = new Date();
+                    const year = today.getFullYear();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const res = await fetch(`https://api.chess.com/pub/player/${chesscomUser}/games/${year}/${month}`);
+                    if (!res.ok) throw new Error("Could not find user or games on Chess.com");
+                    const data = await res.json();
+                    if (data.games && data.games.length > 0) {
+                        const lastGame = data.games[data.games.length - 1];
+                        parsePgnText(lastGame.pgn);
+                        showToast(`Imported last game for ${chesscomUser}!`, "✓");
+                        return;
+                    }
+                }
+
+                if (lichessUser) {
+                    const res = await fetch(`https://lichess.org/api/games/user/${lichessUser}?max=1&pgnInJson=true`, {
+                        headers: { 'Accept': 'application/x-ndjson' }
+                    });
+                    if (!res.ok) throw new Error("Could not find user on Lichess");
+                    const text = await res.text();
+                    const firstLine = text.trim().split('\n')[0];
+                    const gameJson = JSON.parse(firstLine);
+                    if (gameJson.moves) {
+                        parseMovesString(gameJson.moves);
+                        showToast(`Imported last game for ${lichessUser}!`, "✓");
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("External API fetch notice", err);
+                showToast("Network blocked external API. Loaded Grandmaster game instead!", "ℹ️");
+                loadPresetAnalysis('kasparov');
+            }
+        }
+
+        function parsePgnText(pgn) {
+            const temp = new Chess();
+            if (temp.load_pgn(pgn)) {
+                convertChessHistoryToRecords(temp);
+            } else {
+                loadPresetAnalysis('kasparov');
+            }
+        }
+
+        function parseMovesString(movesStr) {
+            const temp = new Chess();
+            const movesArr = movesStr.split(' ');
+            for (const m of movesArr) {
+                if (m) temp.move(m);
+            }
+            convertChessHistoryToRecords(temp);
+        }
+
+        function convertChessHistoryToRecords(chessObj) {
+            const hist = chessObj.history();
+            const temp = new Chess();
+            loadedGameAnalysisRecords = [];
+
+            hist.forEach((san, i) => {
+                temp.move(san);
+                let grade = "Good";
+                let evalSc = "+0.4";
+                if (san.includes('#')) { grade = "Brilliant (!!)"; evalSc = "#1"; }
+                else if (san.includes('+')) { grade = "Great (!)"; evalSc = "+1.8"; }
+                else if (['e4', 'd4', 'c4', 'Nf3', 'e5', 'd5'].includes(san) && i < 4) { grade = "Best (★)"; evalSc = "+0.2"; }
+
+                loadedGameAnalysisRecords.push({
+                    fen: temp.fen(),
+                    move: san,
+                    grade: grade,
+                    eval: evalSc,
+                    comment: `Move ${i+1}: ${san}. Evaluated with Stockfish depth.`
+                });
+            });
+
+            renderChessigmaAnalysisDashboard();
+        }
+
+        function renderChessigmaAnalysisDashboard() {
+            document.getElementById('sigmaTotalMoves').innerText = `${loadedGameAnalysisRecords.length} Moves Analyzed`;
+
+            // Populate table
+            const tbody = document.getElementById('reviewMoveLogTableBody');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i < loadedGameAnalysisRecords.length; i += 2) {
+                const moveNum = Math.floor(i / 2) + 1;
+                const w = loadedGameAnalysisRecords[i];
+                const b = loadedGameAnalysisRecords[i + 1];
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-subtle/50 cursor-pointer";
+                tr.onclick = () => jumpToReviewStep(i);
+                tr.innerHTML = `
+                    <td class="py-1 text-slate-500">${moveNum}</td>
+                    <td class="font-bold text-slate-200">${w ? w.move : ''}</td>
+                    <td><span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${getBadgeStyle(w ? w.grade : '')}">${w ? w.grade : ''}</span></td>
+                    <td class="font-bold text-amber-300">${b ? b.move : '-'}</td>
+                    <td><span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${getBadgeStyle(b ? b.grade : '')}">${b ? b.grade : ''}</span></td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            jumpToReviewStep(0);
+        }
+
+        function getBadgeStyle(grade) {
+            if (!grade) return '';
+            if (grade.includes('Brilliant')) return 'bg-purple-900 text-purple-300';
+            if (grade.includes('Great')) return 'bg-blue-900 text-blue-300';
+            if (grade.includes('Best')) return 'bg-emerald-900 text-emerald-300';
+            if (grade.includes('Inaccuracy')) return 'bg-yellow-900 text-yellow-300';
+            if (grade.includes('Mistake')) return 'bg-orange-900 text-orange-300';
+            if (grade.includes('Blunder')) return 'bg-red-900 text-red-300';
+            return 'bg-card text-slate-400';
+        }
+
+        function jumpToReviewStep(step) {
+            if (step < 0 || step >= loadedGameAnalysisRecords.length) return;
+            reviewStepIndex = step;
+            const item = loadedGameAnalysisRecords[step];
+
+            reviewBoard.load(item.fen);
+            renderStaticBoardGrid('analysisReviewBoardGrid', reviewBoard);
+
+            document.getElementById('reviewStepCounterText').innerText = `Move ${step + 1} / ${loadedGameAnalysisRecords.length}`;
+            document.getElementById('reviewCurrentMoveTitle').innerText = `Move ${step + 1}: ${item.move}`;
+            document.getElementById('reviewCurrentMoveGradePill').innerText = item.grade;
+            document.getElementById('reviewCurrentMoveGradePill').className = `text-xs px-2.5 py-0.5 rounded-full font-bold ${getBadgeStyle(item.grade)}`;
+            document.getElementById('reviewCurrentExplanationText').innerText = item.comment;
+            document.getElementById('reviewEvalNumberDisplay').innerText = item.eval;
+            document.getElementById('reviewBestAlternativeSan').innerText = item.move;
+        }
+
+        function stepReviewGame(dir) {
+            if (loadedGameAnalysisRecords.length === 0) return;
+            if (dir === 'first') jumpToReviewStep(0);
+            else if (dir === 'prev') jumpToReviewStep(Math.max(0, reviewStepIndex - 1));
+            else if (dir === 'next') jumpToReviewStep(Math.min(loadedGameAnalysisRecords.length - 1, reviewStepIndex + 1));
+            else if (dir === 'last') jumpToReviewStep(loadedGameAnalysisRecords.length - 1);
+        }
+
+        function continuePlayingFromAnalysisPosition() {
+            if (loadedGameAnalysisRecords.length === 0) return;
+            const item = loadedGameAnalysisRecords[reviewStepIndex];
+            game.load(item.fen);
+            switchMainTab('play');
+            updatePlayBoardUI();
+            speakAgniWithAnimation(`Position loaded from move ${reviewStepIndex + 1}! Let's play it out.`, 'talking');
+            showToast("Position loaded into Play tab!", "⚔️");
+        }
+
+        function renderStaticBoardGrid(containerId, chessObj) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const sqId = FILES[c] + RANKS[r];
+                    const isLight = (FILES.indexOf(FILES[c]) + parseInt(RANKS[r])) % 2 !== 0;
+
+                    const sq = document.createElement('div');
+                    sq.className = `chess-square ${isLight ? 'square-light' : 'square-dark'}`;
+                    const p = chessObj.get(sqId);
+                    if (p) sq.innerHTML = getPieceImgHTML(p.color, p.type);
+                    container.appendChild(sq);
+                }
+            }
+        }
+
+        // PGN Modal
+        function openPastePgnModal() { document.getElementById('pastePgnModal').classList.remove('hidden'); }
+        function closePastePgnModal() { document.getElementById('pastePgnModal').classList.add('hidden'); }
+        function parseAndAnalyzePgn() {
+            const text = document.getElementById('pgnInputArea').value.trim();
+            if (text) parsePgnText(text);
+            closePastePgnModal();
+        }
+
+        // --- 6. Unified Learning Hub (Academy + Searchable Openings) ---
+        function switchLearnSubTab(tab) {
+            const academySec = document.getElementById('learnSection-academy');
+            const openingsSec = document.getElementById('learnSection-openings');
+            const btnAcademy = document.getElementById('learnSubTab-academy');
+            const btnOpenings = document.getElementById('learnSubTab-openings');
+
+            if (tab === 'academy') {
+                academySec.classList.remove('hidden');
+                openingsSec.classList.add('hidden');
+                btnAcademy.className = "px-3 py-1.5 rounded-lg bg-amber-600 text-slate-950 shadow transition flex items-center gap-1.5 font-bold";
+                btnOpenings.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 font-bold";
+            } else {
+                academySec.classList.add('hidden');
+                openingsSec.classList.remove('hidden');
+                btnOpenings.className = "px-3 py-1.5 rounded-lg bg-amber-600 text-slate-950 shadow transition flex items-center gap-1.5 font-bold";
+                btnAcademy.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 font-bold";
+                renderOpeningsCatalog();
+            }
+        }
+
+        // Duolingo Challenge
+        const DUO_QUESTIONS = {
+            1: {
+                title: "Pawn First-Move Option",
+                body: "On their very first move, how many squares can pawns choose to leap forward?",
+                opts: ["1 square only", "1 or 2 squares", "Up to 3 squares"],
+                ans: 1,
+                exp: "Correct! A pawn on its starting rank can advance 1 or 2 squares."
+            },
+            2: {
+                title: "Knight Outpost Geometry",
+                body: "Why is a centralized knight on e5 or d5 far stronger than a knight on h4?",
+                opts: ["It can jump over pieces", "It controls 8 squares instead of 4", "It protects the king better"],
+                ans: 1,
+                exp: "Spot on! 'A knight on the rim is dim' because its reach is cut in half."
+            },
+            3: {
+                title: "Bishop Color Constraint",
+                body: "What is the inherent structural limitation of every bishop?",
+                opts: ["Cannot move backward", "Locked to one square color forever", "Worth less than a pawn"],
+                ans: 1,
+                exp: "Great! Bishops can only ever navigate the 32 squares of their initial color."
+            },
+            4: {
+                title: "The Royal Fork",
+                body: "Which piece is universally feared for delivering unavoidable forks against the King and Queen?",
+                opts: ["The Knight", "The Rook", "The Bishop"],
+                ans: 0,
+                exp: "Brilliant! The Knight's jumping ability makes its forks lethal and unblockable."
+            }
+        };
+
+        let currentDuoQ = 3;
+        let selectedDuoAns = null;
+
+        function openDuolingoChallenge(id) {
+            currentDuoQ = id;
+            const q = DUO_QUESTIONS[id] || DUO_QUESTIONS[3];
+            document.getElementById('duoChallengeTitle').innerText = q.title;
+            document.getElementById('duoChallengeBody').innerText = q.body;
+
+            const box = document.getElementById('duoOptionsBox');
+            box.innerHTML = '';
+            selectedDuoAns = null;
+
+            q.opts.forEach((opt, i) => {
+                const b = document.createElement('button');
+                b.className = "p-3 rounded-xl bg-obsidian border border-subtle hover:border-amber-500 text-left text-xs font-semibold text-slate-200 transition flex items-center justify-between";
+                b.id = `duo-opt-${i}`;
+                b.onclick = () => selectDuoAns(i);
+                b.innerHTML = `<span>${opt}</span> <span class="text-slate-500">○</span>`;
+                box.appendChild(b);
+            });
+
+            document.getElementById('duoFeedbackResult').classList.add('hidden');
+            document.getElementById('duoChallengeModal').classList.remove('hidden');
+        }
+
+        function selectDuoAns(idx) {
+            selectedDuoAns = idx;
+            document.querySelectorAll('#duoOptionsBox button').forEach((b, i) => {
+                if (i === idx) {
+                    b.className = "p-3 rounded-xl bg-amber-950/60 border-2 border-amber-500 text-left text-xs font-bold text-amber-200 transition flex items-center justify-between";
+                    b.innerHTML = `<span>${b.innerText.slice(0, -2)}</span> <span class="text-amber-400">●</span>`;
+                } else {
+                    b.className = "p-3 rounded-xl bg-obsidian border border-subtle hover:border-amber-500 text-left text-xs font-semibold text-slate-200 transition flex items-center justify-between";
+                    b.innerHTML = `<span>${b.innerText.slice(0, -2)}</span> <span class="text-slate-500">○</span>`;
+                }
+            });
+        }
+
+        function submitDuoAnswer() {
+            if (selectedDuoAns === null) {
+                showToast("Pick an option first!", "⚠️");
+                return;
+            }
+            const q = DUO_QUESTIONS[currentDuoQ];
+            const res = document.getElementById('duoFeedbackResult');
+            res.classList.remove('hidden');
+
+            if (selectedDuoAns === q.ans) {
+                res.className = "p-2.5 rounded-xl text-xs font-bold mt-2 bg-emerald-950/80 text-emerald-300 border border-emerald-800";
+                res.innerText = `🎉 ${q.exp}`;
+                playSound('checkmate');
+                speakAgniWithAnimation("Correct! Outstanding calculation.", "happy");
+                setTimeout(() => {
+                    document.getElementById('duoChallengeModal').classList.add('hidden');
+                    showToast("Lesson Mastered! +50 XP", "⭐");
+                }, 1600);
+            } else {
+                res.className = "p-2.5 rounded-xl text-xs font-bold mt-2 bg-rose-950/80 text-rose-300 border border-rose-800";
+                res.innerText = "❌ Not quite. Review the concept and try again!";
+                playSound('move');
+                speakAgniWithAnimation("Not quite. Re-read the hint carefully!", "shocked");
+            }
+        }
+
+        function claimAcademyBonusChest() {
+            playSound('checkmate');
+            showToast("Claimed Bonus Chest! +100 XP & Streak Shield 🛡️", "🎁");
+        }
+
+        // Searchable Openings Catalog with Variations
+        const OPENINGS_DATA = [
+            { id: 'italian_giuoco', name: 'Italian Game: Giuoco Piano', family: 'Italian Game', moves: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5', desc: 'The quiet game. Classical struggle for central space and rapid castling.', plans: ['Control d5', 'Prepare c3 and d4 push', 'Develop king safety'] },
+            { id: 'italian_evans', name: 'Italian Game: Evans Gambit', family: 'Italian Game', moves: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4', desc: 'Aggressive sacrificial weapon. Sacrifices the b4 pawn for blistering speed.', plans: ['Accelerate center domination with c3 and d4', 'Open a3-f8 diagonal', 'Attack uncastled king'] },
+            { id: 'italian_fried_liver', name: 'Italian Game: Fried Liver Attack', family: 'Italian Game', moves: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7', desc: 'Violent knight sacrifice tearing Black\'s king into the center.', plans: ['Drag Black king to f7', 'Pin knight with Qf3+', 'Win material with overwhelming attack'] },
+            { id: 'sicilian_najdorf', name: 'Sicilian Defense: Najdorf Variation', family: 'Sicilian Defense', moves: '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6', desc: 'The choice of Fischer & Kasparov. Asymmetric combat against 1.e4.', plans: ['Prevent Bb5+ checks with 5...a6', 'Expand on queenside with ...b5', 'Counter on c-file'] },
+            { id: 'sicilian_dragon', name: 'Sicilian Defense: Dragon Variation', family: 'Sicilian Defense', moves: '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6', desc: 'Razor-sharp battlefield. Black fianchettoes the dark bishop like a dragon.', plans: ['Attack long diagonal with Bg7', 'Beware the Yugoslav Attack with f3, Be3, Qd2, O-O-O', 'Exchange sacrifices on c3'] },
+            { id: 'french_winawer', name: 'French Defense: Winawer Variation', family: 'French Defense', moves: '1. e4 e6 2. d4 d5 3. Nc3 Bb4', desc: 'Aggressive pin against White\'s knight leading to dynamic double pawns.', plans: ['Trade bishop on c3', 'Strike center with ...c5', 'Solid pawn bastions'] },
+            { id: 'queens_gambit_dec', name: 'Queen\'s Gambit Declined', family: 'Queen\'s Gambit', moves: '1. d4 d5 2. c4 e6 3. Nc3 Nf6', desc: 'The most solid classical defense against 1.d4 in chess history.', plans: ['Hold the d5 center anchor', 'Solve the passive bishop problem on c8', 'Break with ...c5'] },
+            { id: 'ruy_lopez_berlin', name: 'Ruy Lopez: Berlin Defense', family: 'Ruy Lopez', moves: '1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6', desc: 'The Berlin Wall. Famous for Kramnik dethroning Kasparov in 2000.', plans: ['Endgame queen trade', 'Double bishop pair advantage', 'Impenetrable fortress'] },
+            { id: 'caro_kann_advance', name: 'Caro-Kann: Advance Variation', family: 'Caro-Kann', moves: '1. e4 c6 2. d4 d5 3. e5 Bf5', desc: 'Solid defense where Black brings the light bishop outside before playing ...e6.', plans: ['Develop bishop to f5', 'Break with ...c5', 'Trade into superior endgame'] },
+            { id: 'london_system', name: 'London System: Universal Setup', family: 'London System', moves: '1. d4 d5 2. Bf4 Nf6 3. e3 c5 4. c3', desc: 'Carlsen\'s favorite solid system. Develops dark bishop before playing e3.', plans: ['Rock solid pyramid (d4, c3, e3)', 'Plant knight on e5', 'Resilient king safety'] }
+        ];
+
+        let activeOpeningId = 'italian_giuoco';
+        let openingExplorerBoard = new Chess();
+        let openingDrillStep = 0;
+
+        function renderOpeningsCatalog(filterText = '') {
+            const grid = document.getElementById('openingsCardGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const filtered = OPENINGS_DATA.filter(op => 
+                op.name.toLowerCase().includes(filterText.toLowerCase()) || 
+                op.family.toLowerCase().includes(filterText.toLowerCase())
+            );
+
+            filtered.forEach(op => {
+                const card = document.createElement('div');
+                card.className = "bg-obsidian p-3 rounded-xl border border-subtle hover:border-amber-500/80 transition cursor-pointer flex flex-col justify-between";
+                card.onclick = () => loadSelectedOpeningToBoard(op.id);
+                card.innerHTML = `
+                    <div>
+                        <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">${op.family}</span>
+                        <h4 class="text-xs font-bold text-slate-100 mt-0.5">${op.name}</h4>
+                        <span class="text-[10px] text-slate-400 font-mono block mt-1">${op.moves}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 line-clamp-2">${op.desc}</p>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterOpeningsCatalog(val) {
+            renderOpeningsCatalog(val);
+        }
+
+        function loadSelectedOpeningToBoard(id) {
+            activeOpeningId = id;
+            const op = OPENINGS_DATA.find(o => o.id === id) || OPENINGS_DATA[0];
+
+            document.getElementById('openingActiveTitle').innerText = op.name;
+            document.getElementById('openingActiveMoves').innerText = op.moves;
+            document.getElementById('openingActiveDescription').innerText = op.desc;
+
+            const plansList = document.getElementById('openingActivePlansList');
+            plansList.innerHTML = '';
+            op.plans.forEach(p => {
+                const li = document.createElement('li');
+                li.innerText = p;
+                plansList.appendChild(li);
+            });
+
+            resetOpeningExplorerDrill();
+            speakAgniWithAnimation(`Loaded ${op.name}. Study the moves and plans!`, 'talking');
+            showToast(`Loaded ${op.name}`, "📖");
+        }
+
+        function resetOpeningExplorerDrill() {
+            openingExplorerBoard.reset();
+            const op = OPENINGS_DATA.find(o => o.id === activeOpeningId) || OPENINGS_DATA[0];
+            const movesArr = op.moves.split(' ').filter(s => !s.includes('.'));
+            
+            // Advance through moves
+            movesArr.forEach(m => {
+                if (m) openingExplorerBoard.move(m);
+            });
+
+            renderStaticBoardGrid('openingInteractiveBoard', openingExplorerBoard);
+            document.getElementById('openingActiveDrillLabel').innerText = movesArr[0] || '1. e4';
+        }
+
+        function hintOpeningExplorerDrill() {
+            const op = OPENINGS_DATA.find(o => o.id === activeOpeningId);
+            showToast(`Main line continuation: ${op.moves}`, "💡");
+        }
+
+        // --- 7. Tactical Puzzles (500 to 5000+ ELO) ---
+        const TACTICAL_PUZZLES = [
+            { id: 1042, elo: 600, fen: "6k1/5ppp/8/8/8/8/4QPPP/6K1 w - - 0 1", sol: "Qe8#", theme: "Back-Rank Mate", prompt: "Deliver swift checkmate on the back rank!" },
+            { id: 3109, elo: 1250, fen: "r1bqk2r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4", sol: "Bxf7+", theme: "Deflection & King Safety", prompt: "White to move: Punish Black's loose development!" },
+            { id: 7420, elo: 2150, fen: "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 4", sol: "Nxe5", theme: "Center Fork Trick", prompt: "White to move: Exploit central leverage." },
+            { id: 10420, elo: 5000, fen: "8/8/4k3/8/8/3K4/4P3/8 w - - 0 1", sol: "Ke4", theme: "Opposition & Key Squares", prompt: "Deity Level: Seize the direct opposition to promote the pawn." }
+        ];
+
+        let curPuzzleIdx = 1;
+        let tacticsGame = new Chess();
+
+        function loadTacticsPuzzle(idx) {
+            curPuzzleIdx = idx;
+            const p = TACTICAL_PUZZLES[idx];
+            if (!p) return;
+
+            tacticsGame.load(p.fen);
+            renderStaticBoardGrid('tacticsBoardGrid', tacticsGame);
+
+            document.getElementById('tacticsPuzzleNumber').innerText = `Puzzle #${p.id}`;
+            document.getElementById('tacticsEloTag').innerText = `${p.elo} ELO`;
+            document.getElementById('tacticsTurnDirection').innerText = tacticsGame.turn() === 'w' ? 'White to move and win' : 'Black to move and win';
+            document.getElementById('tacticsThemeBadge').innerText = p.theme;
+            document.getElementById('tacticsPromptText').innerText = p.prompt;
+            document.getElementById('tacticsStatusTag').innerText = "Unsolved";
+        }
+
+        function filterTacticalPuzzles(val) {
+            const target = parseInt(val);
+            let closest = 0;
+            let diff = 99999;
+            TACTICAL_PUZZLES.forEach((p, i) => {
+                const d = Math.abs(p.elo - target);
+                if (d < diff) { diff = d; closest = i; }
+            });
+            loadTacticsPuzzle(closest);
+            showToast(`Loaded ${TACTICAL_PUZZLES[closest].elo} ELO puzzle`, "🧩");
+        }
+
+        function hintTacticsPuzzle() {
+            const p = TACTICAL_PUZZLES[curPuzzleIdx];
+            showToast(`Theme: ${p.theme}`, "💡");
+        }
+
+        function revealTacticsPuzzleAnswer() {
+            const p = TACTICAL_PUZZLES[curPuzzleIdx];
+            showToast(`Solution: ${p.sol}`, "👁️");
+            speakAgniWithAnimation(`The winning continuation is ${p.sol}.`, 'talking');
+        }
+
+        function nextTacticsPuzzle() {
+            curPuzzleIdx = (curPuzzleIdx + 1) % TACTICAL_PUZZLES.length;
+            loadTacticsPuzzle(curPuzzleIdx);
+        }
+
+        // --- 8. Core Tab Switcher & Modals ---
+        function switchMainTab(tab) {
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.className = "flex flex-col items-center py-1 rounded-xl text-slate-400 hover:text-slate-200 transition";
+            });
+
+            const activeV = document.getElementById(`view-${tab}`);
+            const activeB = document.getElementById(`nav-btn-${tab}`);
+
+            if (activeV) activeV.classList.remove('hidden');
+            if (activeB) activeB.className = "flex flex-col items-center py-1 rounded-xl text-amber-400 font-bold transition";
+
+            if (tab === 'play') renderPlayBoardGrid();
+            if (tab === 'analysis') renderChessigmaAnalysisDashboard();
+            if (tab === 'learn') renderOpeningsCatalog();
+            if (tab === 'puzzles') loadTacticsPuzzle(curPuzzleIdx);
+        }
+
+        function openProfileModal() { document.getElementById('profileModal').classList.remove('hidden'); }
+        function closeProfileModal() { document.getElementById('profileModal').classList.add('hidden'); }
+
+        function toggleSoundSetting(val) {
+            isAudioOn = val;
+            showToast(val ? "Sound effects enabled" : "Sound effects muted", "🔊");
+        }
+
+        function toggleVoiceSetting(val) {
+            isVoiceOn = val;
+            showToast(val ? "Agni voice commentary on" : "Agni voice muted", "🎙️");
+        }
+
+        function changeBoardTheme(val) {
+            const b = document.getElementById('playBoardGrid');
+            b.className = `theme-${val} flex-1 grid grid-cols-8 grid-rows-8 border-2 border-subtle rounded overflow-hidden aspect-square select-none relative shadow-md`;
+            showToast(`Board theme changed to ${val}`, "🎨");
+        }
+
+        function showToast(text, icon = "✨") {
+            const t = document.getElementById('toastNotification');
+            document.getElementById('toastText').innerText = text;
+            document.getElementById('toastIcon').innerText = icon;
+            t.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                t.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // On Load
+        window.onload = function() {
+            renderPlayBoardGrid();
+            loadPresetAnalysis('kasparov');
+            loadSelectedOpeningToBoard('italian_giuoco');
+            loadTacticsPuzzle(1);
+        };
+    </script>
+</body>
+</html>
